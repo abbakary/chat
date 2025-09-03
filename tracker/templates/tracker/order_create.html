@@ -125,11 +125,7 @@
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Brand</label>
-                  <div class="input-group">
-                    {{ form.brand }}
-                    <span class="input-group-text" id="odStockCount">0 available</span>
-                  </div>
-                  <div id="odBrandHint" class="form-text">Select item to load brands</div>
+                  {{ form.brand }}
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Quantity</label>
@@ -139,10 +135,6 @@
                   <label class="form-label">Condition</label>
                   {{ form.tire_type }}
                 </div>
-              </div>
-              <div id="odStockInfo" class="alert alert-light border d-flex justify-content-between align-items-center mt-2" style="display:none">
-                <div><small class="fw-semibold">Stock Status:</small> <span id="odStockText">In Stock</span></div>
-                <div id="odStockBadge" class="badge bg-success">OK</div>
               </div>
             </div>
 
@@ -209,38 +201,7 @@
   function toggleBoxes(){ const t = (orderForm.querySelector('[name="type"]').value||'').toLowerCase(); document.getElementById('serviceBox').style.display = (t==='service')? '':'none'; document.getElementById('salesBox').style.display = (t==='sales')? '':'none'; document.getElementById('inquiryBox').style.display = (t==='consultation')? '':'none'; }
   orderForm.querySelector('[name="type"]').addEventListener('change', toggleBoxes); toggleBoxes();
 
-  const odItem = orderForm.querySelector('[name="item_name"]');
-  const currentTypeInit = (orderForm.querySelector('[name="type"]').value||'').toLowerCase();
-  if (currentTypeInit === 'sales') { setTimeout(()=>{ loadBrands(); checkStock(); }, 200); }
-  const odBrand = orderForm.querySelector('[name="brand"]');
-  const odQty = orderForm.querySelector('[name="quantity"]');
-  const odBrandHint = document.getElementById('odBrandHint');
-  const odStockInfo = document.getElementById('odStockInfo');
-  const odStockText = document.getElementById('odStockText');
-  const odStockBadge = document.getElementById('odStockBadge');
-  const odStockCount = document.getElementById('odStockCount');
-
-  if ($ && $.fn.select2){ if(odItem) $(odItem).select2({placeholder:'Select item',width:'100%',allowClear:true}); if(odBrand) $(odBrand).select2({placeholder:'Select brand',width:'100%',allowClear:true}); }
-
-  async function fetchJSON(url){ try{ const r=await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest','Cache-Control':'no-cache','Pragma':'no-cache'}}); return await r.json(); }catch(e){ return {}; } }
-  async function loadBrands(){ if(!odItem||!odBrand) return; const name=odItem.value; const clear=()=>{ if($&&$.fn.select2){ $(odBrand).empty().append('<option value="">Select brand</option>').trigger('change'); } else { odBrand.innerHTML='<option value="">Select brand</option>'; } };
-    const build=(brands)=>{ clear(); let total=0; if(!brands||!brands.length){ if(odBrandHint) odBrandHint.textContent='No brands available for this item'; if(odStockCount) odStockCount.textContent='0 available'; if(odStockInfo) odStockInfo.style.display='none'; return; } brands.forEach(b=>{ const bn=(b.brand&&b.brand.trim())||'Unbranded'; const q=typeof b.quantity==='number'?b.quantity:0; total+=q; const price=b.price||''; const lbl=price?`${bn} (${q} available - ${price})`:`${bn} (${q} available)`; const opt=new Option(lbl, bn); opt.dataset.quantity=q; opt.dataset.price=price; odBrand.add(opt); }); if(odBrandHint) odBrandHint.textContent = `${brands.length} brand${brands.length!==1?'s':''} available`; if(odStockCount) odStockCount.textContent = total>0?`${total} available`:'Out of stock'; if(brands.length===1){ if($) $(odBrand).val((brands[0].brand||'Unbranded')).trigger('change'); else odBrand.value=(brands[0].brand||'Unbranded'); checkStock(); } };
-    if(!name){ clear(); if(odBrandHint) odBrandHint.textContent='Select item to see available brands'; if(odStockCount) odStockCount.textContent='0 available'; if(odStockInfo) odStockInfo.style.display='none'; return; }
-    if(odBrandHint) odBrandHint.innerHTML='<span class="spinner-border spinner-border-sm"></span> Loading brands...';
-    const data = await fetchJSON(`{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}&_=${Date.now()}`);
-    if(data && Array.isArray(data.brands)) build(data.brands); else build([]);
-    if($) $(odBrand).trigger('change');
-    checkStock();
-  }
-  async function checkStock(){ if(!odItem||!odBrand) return; const name=odItem.value; const brand=odBrand.value; const qty=odQty? (parseInt(odQty.value)||0):0; if(!name||!brand){ if(odStockInfo) odStockInfo.style.display='none'; return; }
-    const data = await fetchJSON(`{% url 'tracker:api_inventory_stock' %}?name=${encodeURIComponent(name)}&brand=${encodeURIComponent(brand)}&_=${Date.now()}`);
-    const available = data.available||0; if(odStockCount) odStockCount.textContent = available>0?`${available} available`:'Out of stock'; if(odQty){ odQty.max=available; if(qty>available){ odQty.value = available>0? available: ''; } }
-    if(available===0){ odStockText.textContent='Out of Stock'; odStockBadge.className='badge bg-danger'; odStockBadge.textContent='Out of Stock'; } else if(available<qty){ odStockText.textContent='Insufficient Stock'; odStockBadge.className='badge bg-warning text-dark'; odStockBadge.textContent='Low'; } else if(available<5){ odStockText.textContent='Low Stock'; odStockBadge.className='badge bg-warning text-dark'; odStockBadge.textContent='Low'; } else { odStockText.textContent='In Stock'; odStockBadge.className='badge bg-success'; odStockBadge.textContent='OK'; }
-    if(odStockInfo) odStockInfo.style.display='flex';
-  }
-  odItem?.addEventListener('change', loadBrands);
-  odBrand?.addEventListener('change', checkStock);
-  odQty?.addEventListener('input', debounce(checkStock, 300));
+  // Keep selects static; no inventory API integration
 
   async function searchCustomers(q){ if(!q||q.length<2){ resultsBox.innerHTML=''; return; } const url = `{% url 'tracker:customers_search' %}?q=${encodeURIComponent(q)}`; const data = await fetchJSON(url); const items = data.results||[]; resultsBox.innerHTML = items.map(r=>`<button type="button" class="list-group-item list-group-item-action result-item" data-id="${r.id}"><div class="d-flex justify-content-between"><span class="fw-semibold">${r.name}</span><span class="text-muted small">${r.code||''}</span></div><div class="text-muted small">${r.phone||''}${r.email? ' · '+r.email:''}</div></button>`).join(''); }
   document.getElementById('customerSearch').addEventListener('input', debounce((e)=>{ searchCustomers(e.target.value.trim()); }, 300));
