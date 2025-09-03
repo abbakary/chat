@@ -1,0 +1,263 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}Create Order{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/select2.css' %}">
+<link rel="stylesheet" href="{% static 'css/vendors/flatpickr/flatpickr.min.css' %}">
+<style>
+  .search-panel{background:#f8f9fa;border-radius:8px;padding:1rem;margin-bottom:1rem}
+  .result-item{padding:.5rem .75rem;border-radius:6px;cursor:pointer}
+  .result-item:hover{background:#eef5ff}
+  .customer-card{background:linear-gradient(135deg,#f8f9fa,#e9ecef);border-radius:8px;padding:1rem}
+  .customer-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+  .section-title{color:var(--bs-primary);font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+  .order-section{background:#f8f9fa;border-radius:8px;padding:1rem;margin-bottom:1rem}
+  .badge-pill{padding:.35rem .6rem;border-radius:999px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-1">Create New Order</h3>
+      <p class="text-muted mb-0">Search customer, select order type, and enter details</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'tracker:orders_list' %}" class="btn btn-outline-secondary"><i data-feather="list" class="me-1"></i>All Orders</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="search-panel card">
+        <div class="card-body">
+          <h6 class="section-title"><i data-feather="search" class="feather-16"></i>Select Customer</h6>
+          <div class="mb-2">
+            <input type="text" id="customerSearch" class="form-control" placeholder="Search by name, phone, email, or code..." autocomplete="off">
+          </div>
+          <div id="searchResults" class="list-group small" style="max-height:220px;overflow:auto"></div>
+          <input type="hidden" id="customerId" value="{% if customer %}{{ customer.id }}{% endif %}">
+          {% if customer %}
+          <div id="selectedCustomer" class="mt-3">
+            <div class="customer-card d-flex align-items-center gap-3">
+              <div class="customer-avatar">{{ customer.full_name|first|upper }}</div>
+              <div class="flex-grow-1">
+                <div class="fw-semibold">{{ customer.full_name }}</div>
+                <div class="text-muted small">{{ customer.phone }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
+              </div>
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'tracker:customer_detail' customer.id %}"><i data-feather="user" class="feather-14 me-1"></i>View</a>
+            </div>
+          </div>
+          {% else %}
+          <div id="selectedCustomer" class="mt-3 d-none"></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card d-none" id="customerExtra">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i data-feather="truck" class="feather-14 me-1"></i>Vehicles</h6>
+            <a class="btn btn-sm btn-outline-secondary" id="refreshVehicles"><i data-feather="refresh-ccw" class="feather-14"></i></a>
+          </div>
+          <div id="vehicleList" class="small text-muted">No vehicles</div>
+          <hr>
+          <div>
+            <h6 class="mb-1"><i data-feather="clock" class="feather-14 me-1"></i>Recent Orders</h6>
+            <div id="recentOrders" class="small text-muted">No recent orders</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card">
+        <form id="orderForm" method="post" action="{% url 'tracker:order_start' %}">
+          {% csrf_token %}
+          <div class="card-body">
+            <h6 class="section-title"><i data-feather="clipboard" class="feather-16"></i>Order Details</h6>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Order Type</label>
+                {{ form.type }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Priority</label>
+                {{ form.priority }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Vehicle</label>
+                {{ form.vehicle }}
+              </div>
+            </div>
+
+            <div id="serviceBox" class="order-section mt-3" style="display:none">
+              <h6 class="mb-2"><i data-feather="tool" class="feather-16 me-1"></i>Service Details</h6>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">Services</label>
+                  <div class="row g-2">
+                    {% for cb in form.service_selection %}
+                      <div class="col-sm-6"><div class="form-check">{{ cb.tag }}<label class="form-check-label" for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></div></div>
+                    {% endfor %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Estimated Duration (minutes)</label>
+                  {{ form.estimated_duration }}
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Problem Description</label>
+                  {{ form.description }}
+                </div>
+              </div>
+            </div>
+
+            <div id="salesBox" class="order-section mt-3" style="display:none">
+              <h6 class="mb-2"><i data-feather="shopping-cart" class="feather-16 me-1"></i>Sales Details</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Item</label>
+                  {{ form.item_name }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Brand</label>
+                  <div class="input-group">
+                    {{ form.brand }}
+                    <span class="input-group-text" id="odStockCount">0 available</span>
+                  </div>
+                  <div id="odBrandHint" class="form-text">Select item to load brands</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Quantity</label>
+                  {{ form.quantity }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Condition</label>
+                  {{ form.tire_type }}
+                </div>
+              </div>
+              <div id="odStockInfo" class="alert alert-light border d-flex justify-content-between align-items-center mt-2" style="display:none">
+                <div><small class="fw-semibold">Stock Status:</small> <span id="odStockText">In Stock</span></div>
+                <div id="odStockBadge" class="badge bg-success">OK</div>
+              </div>
+            </div>
+
+            <div id="inquiryBox" class="order-section mt-3" style="display:none">
+              <h6 class="mb-2"><i data-feather="message-circle" class="feather-16 me-1"></i>Consultation Details</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Inquiry Type</label>
+                  {{ form.inquiry_type }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Contact Preference</label>
+                  {{ form.contact_preference }}
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Questions</label>
+                  {{ form.questions }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Follow-up Date</label>
+                  {{ form.follow_up_date }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer d-flex justify-content-between align-items-center">
+            <div class="text-muted small">Status: <span class="badge bg-light text-dark border">Created</span></div>
+            <div>
+              <button type="button" id="submitAjax" class="btn btn-primary"><i data-feather="check" class="me-1"></i>Create Order</button>
+              <button type="submit" class="btn btn-outline-secondary">Submit (Standard)</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/select2/select2.full.min.js' %}"></script>
+<script src="{% static 'js/flat-pickr/flatpickr.js' %}"></script>
+<script>
+(function(){
+  'use strict';
+  const $ = window.jQuery;
+  const orderForm = document.getElementById('orderForm');
+  const customerIdInput = document.getElementById('customerId');
+  const resultsBox = document.getElementById('searchResults');
+  const selectedCustomerBox = document.getElementById('selectedCustomer');
+  const vehicleList = document.getElementById('vehicleList');
+  const recentOrders = document.getElementById('recentOrders');
+  const customerExtra = document.getElementById('customerExtra');
+  const btnSubmitAjax = document.getElementById('submitAjax');
+
+  if ($ && $.fn.select2){ $('select').select2({width:'100%'}); }
+  if (window.flatpickr){ document.querySelectorAll('input[type="date"]').forEach(el=>flatpickr(el,{dateFormat:'Y-m-d',altInput:true,altFormat:'F j, Y'})); }
+
+  function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,a), wait); }; }
+  function getCSRF(){ const el = orderForm.querySelector('[name="csrfmiddlewaretoken"]'); return el? el.value: ''; }
+
+  function toggleBoxes(){ const t = (orderForm.querySelector('[name="type"]').value||'').toLowerCase(); document.getElementById('serviceBox').style.display = (t==='service')? '':'none'; document.getElementById('salesBox').style.display = (t==='sales')? '':'none'; document.getElementById('inquiryBox').style.display = (t==='consultation')? '':'none'; }
+  orderForm.querySelector('[name="type"]').addEventListener('change', toggleBoxes); toggleBoxes();
+
+  const odItem = orderForm.querySelector('[name="item_name"]');
+  const odBrand = orderForm.querySelector('[name="brand"]');
+  const odQty = orderForm.querySelector('[name="quantity"]');
+  const odBrandHint = document.getElementById('odBrandHint');
+  const odStockInfo = document.getElementById('odStockInfo');
+  const odStockText = document.getElementById('odStockText');
+  const odStockBadge = document.getElementById('odStockBadge');
+  const odStockCount = document.getElementById('odStockCount');
+
+  if ($ && $.fn.select2){ if(odItem) $(odItem).select2({placeholder:'Select item',width:'100%',allowClear:true}); if(odBrand) $(odBrand).select2({placeholder:'Select brand',width:'100%',allowClear:true}); }
+
+  async function fetchJSON(url){ try{ const r=await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest','Cache-Control':'no-cache','Pragma':'no-cache'}}); return await r.json(); }catch(e){ return {}; } }
+  async function loadBrands(){ if(!odItem||!odBrand) return; const name=odItem.value; const clear=()=>{ if($&&$.fn.select2){ $(odBrand).empty().append('<option value="">Select brand</option>').trigger('change'); } else { odBrand.innerHTML='<option value="">Select brand</option>'; } };
+    const build=(brands)=>{ clear(); let total=0; if(!brands||!brands.length){ if(odBrandHint) odBrandHint.textContent='No brands available for this item'; if(odStockCount) odStockCount.textContent='0 available'; if(odStockInfo) odStockInfo.style.display='none'; return; } brands.forEach(b=>{ const bn=(b.brand&&b.brand.trim())||'Unbranded'; const q=typeof b.quantity==='number'?b.quantity:0; total+=q; const price=b.price||''; const lbl=price?`${bn} (${q} available - ${price})`:`${bn} (${q} available)`; const opt=new Option(lbl, bn); opt.dataset.quantity=q; opt.dataset.price=price; odBrand.add(opt); }); if(odBrandHint) odBrandHint.textContent = `${brands.length} brand${brands.length!==1?'s':''} available`; if(odStockCount) odStockCount.textContent = total>0?`${total} available`:'Out of stock'; if(brands.length===1){ if($) $(odBrand).val((brands[0].brand||'Unbranded')).trigger('change'); else odBrand.value=(brands[0].brand||'Unbranded'); checkStock(); } };
+    if(!name){ clear(); if(odBrandHint) odBrandHint.textContent='Select item to see available brands'; if(odStockCount) odStockCount.textContent='0 available'; if(odStockInfo) odStockInfo.style.display='none'; return; }
+    if(odBrandHint) odBrandHint.innerHTML='<span class="spinner-border spinner-border-sm"></span> Loading brands...';
+    const data = await fetchJSON(`{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}&_=${Date.now()}`);
+    if(data && Array.isArray(data.brands)) build(data.brands); else build([]);
+    if($) $(odBrand).trigger('change');
+    checkStock();
+  }
+  async function checkStock(){ if(!odItem||!odBrand) return; const name=odItem.value; const brand=odBrand.value; const qty=odQty? (parseInt(odQty.value)||0):0; if(!name||!brand){ if(odStockInfo) odStockInfo.style.display='none'; return; }
+    const data = await fetchJSON(`{% url 'tracker:api_inventory_stock' %}?name=${encodeURIComponent(name)}&brand=${encodeURIComponent(brand)}&_=${Date.now()}`);
+    const available = data.available||0; if(odStockCount) odStockCount.textContent = available>0?`${available} available`:'Out of stock'; if(odQty){ odQty.max=available; if(qty>available){ odQty.value = available>0? available: ''; } }
+    if(available===0){ odStockText.textContent='Out of Stock'; odStockBadge.className='badge bg-danger'; odStockBadge.textContent='Out of Stock'; } else if(available<qty){ odStockText.textContent='Insufficient Stock'; odStockBadge.className='badge bg-warning text-dark'; odStockBadge.textContent='Low'; } else if(available<5){ odStockText.textContent='Low Stock'; odStockBadge.className='badge bg-warning text-dark'; odStockBadge.textContent='Low'; } else { odStockText.textContent='In Stock'; odStockBadge.className='badge bg-success'; odStockBadge.textContent='OK'; }
+    if(odStockInfo) odStockInfo.style.display='flex';
+  }
+  odItem?.addEventListener('change', loadBrands);
+  odBrand?.addEventListener('change', checkStock);
+  odQty?.addEventListener('input', debounce(checkStock, 300));
+
+  async function searchCustomers(q){ if(!q||q.length<2){ resultsBox.innerHTML=''; return; } const url = `{% url 'tracker:customers_search' %}?q=${encodeURIComponent(q)}`; const data = await fetchJSON(url); const items = data.results||[]; resultsBox.innerHTML = items.map(r=>`<button type="button" class="list-group-item list-group-item-action result-item" data-id="${r.id}"><div class="d-flex justify-content-between"><span class="fw-semibold">${r.name}</span><span class="text-muted small">${r.code||''}</span></div><div class="text-muted small">${r.phone||''}${r.email? ' · '+r.email:''}</div></button>`).join(''); }
+  document.getElementById('customerSearch').addEventListener('input', debounce((e)=>{ searchCustomers(e.target.value.trim()); }, 300));
+  resultsBox.addEventListener('click', async (e)=>{ const btn=e.target.closest('.result-item'); if(!btn) return; const id=btn.dataset.id; customerIdInput.value=id; resultsBox.innerHTML=''; document.getElementById('customerSearch').value=''; const details = await fetchJSON(`{% url 'tracker:customers_search' %}?details=1&customer_id=${encodeURIComponent(id)}`); const r=(details.results||[])[0]||{}; selectedCustomerBox.classList.remove('d-none'); selectedCustomerBox.innerHTML = `<div class="customer-card d-flex align-items-center gap-3"><div class="customer-avatar">${(r.name||'?').charAt(0).toUpperCase()}</div><div class="flex-grow-1"><div class="fw-semibold">${r.name||''}</div><div class="text-muted small">${r.phone||''}${r.email? ' · '+r.email:''}</div></div><a class="btn btn-sm btn-outline-primary" href="{% url 'tracker:customers_list' %}${r.id? '' : ''}" onclick="event.preventDefault(); if(${!!r.id}) window.location='{% url 'tracker:customer_detail' 0 %}'.replace('/0/','/${r.id}/');"><i data-feather='user' class='feather-14 me-1'></i>View</a></div>`;
+    customerExtra.classList.remove('d-none'); vehicleList.innerHTML = (r.vehicles||[]).length? r.vehicles.map(v=>`<span class='badge bg-light text-dark border me-1 mb-1 badge-pill'>${v.plate_number||''} ${v.make||''} ${v.model||''}</span>`).join(''): 'No vehicles'; recentOrders.innerHTML = (r.orders||[]).length? r.orders.map(o=>`<div><span class='badge bg-light text-dark border me-1'>${o.type}</span> #${o.order_number} · <span class='text-muted'>${o.status.replace('_',' ')}</span></div>`).join(''): 'No recent orders'; if(window.feather) feather.replace(); });
+
+  btnSubmitAjax?.addEventListener('click', async ()=>{
+    const cid = customerIdInput.value; if(!cid){ alert('Please select a customer first.'); return; }
+    const fd = new FormData(orderForm); fd.set('customer_id', cid);
+    try{
+      const r = await fetch(orderForm.action, { method:'POST', headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCSRF() }, body: fd });
+      const data = await r.json();
+      if(data.success){ window.location = '{% url 'tracker:order_detail' 0 %}'.replace('/0/','/'+data.order_id+'/'); }
+      else { alert(data.message||'Could not create order'); if(data.code==='insufficient_stock' && typeof data.available!=='undefined'){ if(odQty){ odQty.max=data.available; odQty.value=data.available; } checkStock(); } }
+    }catch(e){ alert('Network error. Please try again.'); }
+  });
+
+  if('{{ customer.id|default:"" }}'){ customerExtra.classList.remove('d-none'); }
+
+  if (window.feather){ feather.replace(); }
+})();
+</script>
+{% endblock %}
