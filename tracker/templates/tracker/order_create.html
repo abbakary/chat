@@ -38,7 +38,7 @@
             <input type="text" id="customerSearch" class="form-control" placeholder="Search by name, phone, email, or code..." autocomplete="off">
           </div>
           <div id="searchResults" class="list-group small" style="max-height:220px;overflow:auto"></div>
-          <input type="hidden" id="customerId" value="{% if customer %}{{ customer.id }}{% endif %}">
+          <input type="hidden" name="customer_id" id="customerId" value="{% if customer %}{{ customer.id }}{% endif %}">
           {% if customer %}
           <div id="selectedCustomer" class="mt-3">
             <div class="customer-card d-flex align-items-center gap-3">
