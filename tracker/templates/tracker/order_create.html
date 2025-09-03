@@ -292,6 +292,14 @@
 
   // Keep selects static; no inventory API integration
 
+  // Lightweight JSON fetch helper
+  async function fetchJSON(url){
+    try{ const r = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    }catch(e){ console.warn('fetchJSON error', e); return {}; }
+  }
+
   // Service-specific UI toggle
   const svcSections = Array.from(document.querySelectorAll('.svc-section'));
   function updateServiceSections(){
