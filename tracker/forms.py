@@ -196,6 +196,16 @@ class CustomerStep4Form(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            choices = list(self.fields['customer_type'].choices)
+        except Exception:
+            choices = []
+        if choices and (not choices[0] or choices[0][0] != ''):
+            self.fields['customer_type'].choices = [('', 'Select customer type')] + choices
+        self.fields['customer_type'].initial = ''
+
     def clean(self):
         cleaned = super().clean()
         customer_type = cleaned.get('customer_type')
@@ -308,11 +318,15 @@ class OrderForm(forms.ModelForm):
         self.fields["item_name"].widget = forms.Select(attrs={'class': 'form-select'}, choices=name_choices)
 
         try:
+            from django.db.models import Q
             brands = list(InventoryItem.objects.exclude(brand__isnull=True).exclude(brand='').values_list('brand', flat=True).order_by('brand').distinct())
+            has_unbranded = InventoryItem.objects.filter(Q(brand__isnull=True) | Q(brand='')).exists()
             brand_choices = [('', 'Select brand')] + [(b, b) for b in brands if b]
+            if has_unbranded:
+                brand_choices.append(('Unbranded','Unbranded'))
         except Exception:
             brand_choices = [('', 'Select brand')]
-        self.fields["brand"].widget = forms.Select(attrs={'class': 'form-select'}, choices=brand_choices)
+        self.fields['brand'].widget = forms.Select(attrs={'class': 'form-select'}, choices=brand_choices)
         
         # Tire type choices
         self.fields["tire_type"].widget = forms.Select(
