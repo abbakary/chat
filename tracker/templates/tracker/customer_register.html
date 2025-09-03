@@ -468,7 +468,26 @@
   const orgFields=document.getElementById('orgFields');
   const personalFields=document.getElementById('personalFields');
   function setDisabled(container,disabled){ if(!container)return; container.querySelectorAll('input,select,textarea').forEach(el=>{ el.disabled=!!disabled; if(disabled){ if(el.type==='checkbox'||el.type==='radio') el.checked=false; else el.value=''; }}); }
-  function updateCustomerTypeFields(){ const t=customerTypeSelect?.value||''; const isOrg=['government','ngo','company'].includes(t); const isPersonal=t==='personal'; if(orgFields){ orgFields.style.display=isOrg?'':'none'; setDisabled(orgFields,!isOrg); const orgName=document.querySelector('[name="organization_name"]'); const tax=document.querySelector('[name="tax_number"]'); if(orgName) orgName.required=isOrg; if(tax) tax.required=isOrg; } if(personalFields){ personalFields.style.display=isPersonal?'':'none'; setDisabled(personalFields,!isPersonal); const subtype=document.querySelector('[name="personal_subtype"]'); if(subtype) subtype.required=isPersonal; } }
+  function updateCustomerTypeFields(){
+    const t = customerTypeSelect?.value || '';
+    const isOrg = ['government','ngo','company'].includes(t);
+    const showPersonal = ['personal','bodaboda'].includes(t);
+    const requireSubtype = t === 'personal';
+    if (orgFields){
+      orgFields.style.display = isOrg ? '' : 'none';
+      setDisabled(orgFields, !isOrg);
+      const orgName = document.querySelector('[name="organization_name"]');
+      const tax = document.querySelector('[name="tax_number"]');
+      if (orgName) orgName.required = isOrg;
+      if (tax) tax.required = isOrg;
+    }
+    if (personalFields){
+      personalFields.style.display = showPersonal ? '' : 'none';
+      setDisabled(personalFields, !showPersonal);
+      const subtype = document.querySelector('[name="personal_subtype"]');
+      if (subtype) subtype.required = requireSubtype;
+    }
+  }
   customerTypeSelect?.addEventListener('change', updateCustomerTypeFields); updateCustomerTypeFields();
 
   const intentType = '{% if intent == "service" %}service{% elif intent == "sales" %}sales{% elif intent == "inquiry" %}consultation{% else %}{% endif %}';
@@ -506,7 +525,8 @@
       crStockText.textContent = available>0? 'In Stock': 'Out of Stock'; let cls='badge '; let text=''; if(available===0){ cls+='bg-danger'; text='Out of Stock'; } else if(available<qty){ cls+='bg-warning text-dark'; text='Insufficient Stock'; } else if(available<5){ cls+='bg-warning text-dark'; text='Low Stock'; } else { cls+='bg-success'; text='In Stock'; } crStockBadge.className=cls; crStockBadge.textContent=text; crStockInfo.style.display='flex'; }catch(e){ crStockText.textContent='Error checking stock'; crStockBadge.className='badge bg-secondary'; crStockBadge.textContent='Unknown'; crStockInfo.style.display='flex'; }
   }
 
-  if (window.location.search.includes('step=4') && '{{ intent }}' === 'sales') { setTimeout(()=>{ initFormElements(); setupEventListeners(); loadBrandsCR(); checkStockCR(); const typeInput=document.getElementById('id_type'); if(typeInput){ typeInput.value='sales'; } }, 300); } else { initFormElements(); setupEventListeners(); }
+  const isStep4 = String('{{ step }}') === '4' || window.location.search.includes('step=4');
+  if (isStep4 && '{{ intent }}' === 'sales') { setTimeout(()=>{ initFormElements(); setupEventListeners(); loadBrandsCR(); checkStockCR(); const typeInput=document.getElementById('id_type'); if(typeInput){ typeInput.value='sales'; } }, 300); } else { initFormElements(); setupEventListeners(); }
 
   const f=document.querySelector('form[method="post"]');
   if(f){ f.addEventListener('submit', function(){ if('{{ intent }}'==='sales'){ const typeInput=document.getElementById('id_type'); if(typeInput){ typeInput.value='sales'; } } }); }
