@@ -350,6 +350,8 @@
 
   if('{{ customer.id|default:"" }}'){ customerExtra.classList.remove('d-none'); }
 
+  orderForm.addEventListener('submit', function(){ const descEl = orderForm.querySelector('[name="description"]'); if (descEl){ const extra = buildServiceDetails(); if(extra && !descEl.value.includes('Details:')) descEl.value = (descEl.value||'') + '\n' + extra; } });
+
   if (window.feather){ feather.replace(); }
 })();
 </script>
