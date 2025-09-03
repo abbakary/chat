@@ -219,8 +219,9 @@
   function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,a), wait); }; }
   function getCSRF(){ const el = orderForm.querySelector('[name="csrfmiddlewaretoken"]'); return el? el.value: ''; }
 
-  function toggleBoxes(){ const t = (orderForm.querySelector('[name="type"]').value||'').toLowerCase(); document.getElementById('serviceBox').style.display = (t==='service')? '':'none'; document.getElementById('salesBox').style.display = (t==='sales')? '':'none'; document.getElementById('inquiryBox').style.display = (t==='consultation')? '':'none'; }
+  function toggleBoxes(){ const t = (orderForm.querySelector('[name="type"]').value||'').toLowerCase(); document.getElementById('serviceBox').style.display = (t==='service')? '':'none'; document.getElementById('salesBox').style.display = (t==='sales')? '':'none'; document.getElementById('inquiryBox').style.display = (t==='consultation')? '':'none'; document.querySelectorAll('.type-toggle').forEach(btn=>btn.classList.toggle('active', btn.dataset.type===t)); }
   orderForm.querySelector('[name="type"]').addEventListener('change', toggleBoxes); toggleBoxes();
+  document.querySelectorAll('.type-toggle').forEach(btn=>{ btn.addEventListener('click', ()=>{ const sel = orderForm.querySelector('[name="type"]'); sel.value = btn.dataset.type; if (window.jQuery && jQuery.fn.select2) { jQuery(sel).trigger('change.select2'); } sel.dispatchEvent(new Event('change',{bubbles:true})); }); });
 
   // Keep selects static; no inventory API integration
 
