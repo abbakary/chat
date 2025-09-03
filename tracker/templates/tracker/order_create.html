@@ -209,6 +209,8 @@
   orderForm.querySelector('[name="type"]').addEventListener('change', toggleBoxes); toggleBoxes();
 
   const odItem = orderForm.querySelector('[name="item_name"]');
+  const currentTypeInit = (orderForm.querySelector('[name="type"]').value||'').toLowerCase();
+  if (currentTypeInit === 'sales') { setTimeout(()=>{ loadBrands(); checkStock(); }, 200); }
   const odBrand = orderForm.querySelector('[name="brand"]');
   const odQty = orderForm.querySelector('[name="quantity"]');
   const odBrandHint = document.getElementById('odBrandHint');
