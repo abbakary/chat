@@ -41,13 +41,27 @@
           <input type="hidden" name="customer_id" id="customerId" value="{% if customer %}{{ customer.id }}{% endif %}">
           {% if customer %}
           <div id="selectedCustomer" class="mt-3">
-            <div class="customer-card d-flex align-items-center gap-3">
-              <div class="customer-avatar">{{ customer.full_name|first|upper }}</div>
-              <div class="flex-grow-1">
-                <div class="fw-semibold">{{ customer.full_name }}</div>
-                <div class="text-muted small">{{ customer.phone }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
+            <div class="customer-card">
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <div class="customer-avatar">{{ customer.full_name|first|upper }}</div>
+                <div class="flex-grow-1">
+                  <div class="fw-semibold">{{ customer.full_name }}</div>
+                  <div class="text-muted small">{{ customer.phone }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'tracker:customer_detail' customer.id %}"><i data-feather="user" class="feather-14 me-1"></i>View</a>
               </div>
-              <a class="btn btn-sm btn-outline-primary" href="{% url 'tracker:customer_detail' customer.id %}"><i data-feather="user" class="feather-14 me-1"></i>View</a>
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                {% if customer.customer_type %}<span class="badge bg-light text-dark border">{{ customer.get_customer_type_display }}</span>{% endif %}
+                {% if customer.current_status %}<span class="badge bg-primary-subtle text-primary border">{{ customer.get_current_status_display }}</span>{% endif %}
+                <span class="badge bg-light text-dark border">Code: {{ customer.code }}</span>
+              </div>
+              <div class="row g-2 small">
+                <div class="col-6"><strong>Visits:</strong> {{ customer.total_visits }}</div>
+                <div class="col-6"><strong>Last Visit:</strong> {{ customer.last_visit|date:"Y-m-d H:i"|default:'—' }}</div>
+                {% if customer.address %}<div class="col-12"><strong>Address:</strong> {{ customer.address }}</div>{% endif %}
+                {% if customer.organization_name %}<div class="col-12"><strong>Org:</strong> {{ customer.organization_name }}{% if customer.tax_number %} · {{ customer.tax_number }}{% endif %}</div>{% endif %}
+                {% if customer.personal_subtype %}<div class="col-12"><strong>Subtype:</strong> {{ customer.get_personal_subtype_display }}</div>{% endif %}
+              </div>
             </div>
           </div>
           {% else %}
@@ -77,7 +91,14 @@
         <form id="orderForm" method="post" action="{% url 'tracker:order_start' %}">
           {% csrf_token %}
           <div class="card-body">
-            <h6 class="section-title"><i data-feather="clipboard" class="feather-16"></i>Order Details</h6>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="section-title m-0"><i data-feather="clipboard" class="feather-16"></i>Order Details</h6>
+              <div class="btn-group" role="group" aria-label="Order type">
+                <button type="button" class="btn btn-outline-primary btn-sm type-toggle" data-type="service"><i data-feather="tool" class="feather-14 me-1"></i>Service</button>
+                <button type="button" class="btn btn-outline-warning btn-sm type-toggle" data-type="sales"><i data-feather="shopping-cart" class="feather-14 me-1"></i>Sales</button>
+                <button type="button" class="btn btn-outline-info btn-sm type-toggle" data-type="consultation"><i data-feather="message-circle" class="feather-14 me-1"></i>Consultation</button>
+              </div>
+            </div>
 
             <div class="row g-3">
               <div class="col-md-4">
