@@ -135,6 +135,73 @@
                   {{ form.description }}
                 </div>
               </div>
+
+              <div class="border rounded p-2 mt-2 bg-white">
+                <div class="small text-muted mb-2">Service Details</div>
+                <div id="svc-oil_change" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Oil Grade</label>
+                    <select class="form-select" name="svc_oil_grade">
+                      <option value="">Select</option>
+                      <option>5W-30</option>
+                      <option>5W-40</option>
+                      <option>10W-40</option>
+                      <option>15W-40</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="svc_oil_filter" id="svc_oil_filter">
+                      <label class="form-check-label" for="svc_oil_filter">Replace oil filter</label>
+                    </div>
+                  </div>
+                </div>
+                <div id="svc-engine_diagnostics" class="row g-2 svc-section" style="display:none">
+                  <div class="col-12">
+                    <label class="form-label">Observed Symptoms</label>
+                    <textarea class="form-control" rows="2" name="svc_diag_symptoms" placeholder="E.g., check-engine light, rough idle"></textarea>
+                  </div>
+                </div>
+                <div id="svc-brake_repair" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Axle</label>
+                    <select class="form-select" name="svc_brake_axle">
+                      <option value="">Select</option>
+                      <option>Front</option>
+                      <option>Rear</option>
+                      <option>Both</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Additional Notes</label>
+                    <input class="form-control" name="svc_brake_notes" placeholder="Pads, rotors, fluid, etc.">
+                  </div>
+                </div>
+                <div id="svc-wheel_alignment" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Alignment Type</label>
+                    <select class="form-select" name="svc_align_type">
+                      <option value="">Select</option>
+                      <option>Front-end</option>
+                      <option>Four-wheel</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Notes</label>
+                    <input class="form-control" name="svc_align_notes" placeholder="Pulling, uneven tire wear, etc.">
+                  </div>
+                </div>
+                <div id="svc-battery_check" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Battery Age (years)</label>
+                    <input class="form-control" type="number" min="0" step="0.1" name="svc_batt_age">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Notes</label>
+                    <input class="form-control" name="svc_batt_notes" placeholder="Cranking, lights dim, etc.">
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div id="salesBox" class="order-section mt-3" style="display:none">
