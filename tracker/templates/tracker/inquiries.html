@@ -1,0 +1,107 @@
+{% extends 'tracker/base.html' %}
+{% block title %}Inquiries{% endblock %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Inquiries</h4>
+  </div>
+
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-sm-3">
+      <select name="type" class="form-select">
+        <option value="" selected>All types</option>
+        <option value="Pricing">Pricing</option>
+        <option value="Services">Services</option>
+        <option value="Appointment Booking">Appointment Booking</option>
+        <option value="General">General</option>
+      </select>
+    </div>
+    <div class="col-sm-3">
+      <select name="status" class="form-select">
+        <option value="">All status</option>
+        <option value="created">New</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Resolved</option>
+      </select>
+    </div>
+    <div class="col-sm-3">
+      <select name="follow_up" class="form-select">
+        <option value="">All</option>
+        <option value="required">Follow-up Required</option>
+        <option value="overdue">Overdue</option>
+      </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-outline-primary" type="submit">Apply</button></div>
+  </form>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted">New</div><div class="display-6">{{ stats.new }}</div></div></div></div>
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted">In Progress</div><div class="display-6">{{ stats.in_progress }}</div></div></div></div>
+    <div class="col-md-4"><div class="card text-center"><div class="card-body"><div class="text-muted">Resolved</div><div class="display-6">{{ stats.resolved }}</div></div></div></div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table mb-0">
+        <thead class="table-light"><tr><th>#</th><th>Customer</th><th>Type</th><th>Status</th><th>Follow Up</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          {% for i in inquiries %}
+            <tr>
+              <td>{{ i.order_number }}</td>
+              <td>{{ i.customer.full_name }}</td>
+              <td>{{ i.inquiry_type|default:'General' }}</td>
+              <td class="text-capitalize">{{ i.status|default:'created' }}</td>
+              <td>{{ i.follow_up_date|date:'Y-m-d'|default:'-' }}</td>
+              <td class="text-end">
+                <div class="dropdown action-menu">
+                  <button class="btn btn-outline-secondary btn-icon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i data-feather="more-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <form method="post" action="{% url 'tracker:update_inquiry_status' i.id %}" class="px-3 py-1">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="completed">
+                        <button class="btn btn-link p-0 text-success"><i data-feather="check-circle" class="me-2"></i>Mark Resolved</button>
+                      </form>
+                    </li>
+                    <li><a class="dropdown-item" data-bs-toggle="collapse" href="#reply-{{ i.id }}"><i data-feather="message-circle" class="me-2"></i>Respond</a></li>
+                    <li><a class="dropdown-item" href="{% url 'tracker:customer_detail' i.customer.id %}"><i data-feather="user" class="me-2"></i>View Customer</a></li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+            <tr class="collapse" id="reply-{{ i.id }}">
+              <td colspan="6">
+                <form method="post" action="{% url 'tracker:inquiry_respond' i.id %}" class="row g-2">
+                  {% csrf_token %}
+                  <div class="col-12"><textarea name="response" class="form-control" rows="3" placeholder="Type your response..."></textarea></div>
+                  <div class="col-sm-4 form-check ms-2">
+                    <input class="form-check-input" type="checkbox" name="follow_up_required" id="fu-{{ i.id }}">
+                    <label class="form-check-label" for="fu-{{ i.id }}">Follow-up required</label>
+                  </div>
+                  <div class="col-sm-4"><input type="date" name="follow_up_date" class="form-control" value="{{ today }}"></div>
+                  <div class="col-auto"><button class="btn btn-primary" type="submit">Send</button></div>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-center p-3">No inquiries</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer">
+      <nav>
+        <ul class="pagination mb-0">
+          {% if inquiries.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ inquiries.previous_page_number }}">Prev</a></li>
+          {% endif %}
+          <li class="page-item disabled"><span class="page-link">Page {{ inquiries.number }} of {{ inquiries.paginator.num_pages }}</span></li>
+          {% if inquiries.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ inquiries.next_page_number }}">Next</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,408 @@
+{% extends 'tracker/base.html' %}
+
+{% load static roles %}
+{% block title %}Dashboard - Car Service Tracker{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Particles background */
+  .dashboard-surface { position: relative; }
+  .particles-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  .dashboard-layer { position: relative; z-index: 1; }
+
+  /* Metric cards styled compact like dashboard-02 */
+  .metric-card { background: var(--light-background); border: 1px solid var(--chart-border); border-radius: 12px; }
+  .metric-card .metric-title { color: var(--text-gray); font-weight: 500; }
+  .metric-card .metric-value { color: var(--bs-heading-color); font-weight: 700; }
+  .metric-icon { width: 40px; height: 40px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+  .metric-icon.primary { background: rgba(0,102,102,.12); color: var(--theme-deafult); }
+  .metric-icon.warning { background: rgba(255,174,26,.15); color: #FFAE1A; }
+  .metric-icon.info { background: rgba(23,56,120,.12); color: #173878; }
+  .metric-icon.success { background: rgba(0,172,70,.12); color: #00AC46; }
+
+  /* Charts container look */
+  .chart-card { border-radius: 12px; border: 1px solid var(--chart-border); box-shadow: 0 1px 0 var(--product-shadow); background: var(--white); }
+  .chart-card .card-header { border-bottom: 0; }
+
+  /* Tables */
+  .table thead th { white-space: nowrap; }
+  .status-badge { padding: .375rem .75rem; border-radius: 6px; font-size: .75rem; font-weight: 600; }
+  .status-created { background: #e3f2fd; color: #1976d2; }
+  .status-assigned { background: #fff3e0; color: #f57c00; }
+  .status-in_progress { background: #e8f5e8; color: #388e3c; }
+  .status-completed { background: #e8f5e8; color: #2e7d32; }
+  .status-cancelled { background: #ffebee; color: #d32f2f; }
+
+  .priority-badge { padding: .25rem .5rem; border-radius: 4px; font-size: .7rem; font-weight: 500; }
+  .priority-low { background: #e3f2fd; color: #1976d2; }
+  .priority-normal { background: #e8f5e8; color: #388e3c; }
+  .priority-high { background: #fff3e0; color: #f57c00; }
+  .priority-urgent { background: #ffebee; color: #d32f2f; }
+
+  /* Inventory table visual cues */
+  .stock-ok { color: #00AC46; }
+  .stock-low { color: #FFAE1A; }
+  .stock-out { color: #FE6A49; }
+
+  /* Quick actions */
+  .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .action-btn { display: flex; align-items: center; gap: .5rem; padding: .9rem 1rem; background: var(--white); border: 1px solid var(--chart-border); border-radius: 10px; text-decoration: none; color: var(--bs-card-color); transition: transform .2s ease, border-color .2s ease; }
+  .action-btn:hover { transform: translateY(-2px); border-color: var(--theme-deafult); color: var(--theme-deafult); }
+
+  /* Greeting hand */
+  .greet-hand { display: inline-block; margin-left: 4px; transform-origin: 70% 70%; animation: wave 2s ease-in-out infinite; }
+  @keyframes wave { 0% { transform: rotate(0deg);} 10% { transform: rotate(14deg);} 20% { transform: rotate(-8deg);} 30% { transform: rotate(14deg);} 40% { transform: rotate(-4deg);} 50% { transform: rotate(10deg);} 60% { transform: rotate(0deg);} 100% { transform: rotate(0deg);} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid dashboard-surface">
+  <canvas id="dashboardParticles" class="particles-canvas" aria-hidden="true"></canvas>
+  <div class="dashboard-layer">
+
+    <!-- Greeting & Quick actions -->
+    <div class="row g-4 mb-2 align-items-center">
+      <div class="col-12 col-xl-8">
+        <div class="d-flex align-items-center gap-2">
+          <h4 class="mb-0">Welcome, {{ request.user.first_name|default:request.user.username }} <span class="greet-hand" aria-hidden="true">👋</span></h4>
+        </div>
+        <p class="text-muted mb-0">Here’s what’s happening with your workshop today.</p>
+      </div>
+      <div class="col-12 mt-2 d-xl-none"></div>
+      <div class="col-12 col-xl-4">
+        <div class="quick-actions">
+          <a href="{% url 'tracker:order_start' %}" class="action-btn"><i data-feather="plus-circle"></i><span>New Order</span></a>
+          <a href="{% url 'tracker:customer_register' %}" class="action-btn"><i data-feather="user-plus"></i><span>Register Customer</span></a>
+          <a href="{% url 'tracker:inventory_list' %}" class="action-btn"><i data-feather="package"></i><span>Inventory</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overview: Trend chart + Metrics -->
+    <div class="row g-4 mb-4">
+      <div class="col-xl-7">
+        <div class="card chart-card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Orders Overview</h5>
+            <span class="text-muted small">Last 14 days</span>
+          </div>
+          <div class="card-body pt-0">
+            <div id="trendChart" style="min-height: 280px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-xl-5">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <div class="card metric-card">
+              <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="metric-title small mb-1">Total Orders</div>
+                  <div class="metric-value h3 mb-0">{{ total_orders|default:0 }}</div>
+                </div>
+                <div class="metric-icon primary"><i data-feather="shopping-cart"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="card metric-card">
+              <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="metric-title small mb-1">Active Orders</div>
+                  <div class="metric-value h3 mb-0">{{ active_count|default:0 }}</div>
+                </div>
+                <div class="metric-icon info"><i data-feather="activity"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="card metric-card">
+              <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="metric-title small mb-1">Customers</div>
+                  <div class="metric-value h3 mb-0">{{ total_customers|default:0 }}</div>
+                </div>
+                <div class="metric-icon warning"><i data-feather="users"></i></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="card metric-card">
+              <div class="card-body d-flex align-items-center justify-content-between">
+                <div>
+                  <div class="metric-title small mb-1">Total Stock</div>
+                  <div class="metric-value h3 mb-0">{{ total_stock|default:0 }}</div>
+                </div>
+                <div class="metric-icon success"><i data-feather="package"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Donut charts row (status/type/priority) -->
+    <div class="row g-4 mb-4">
+      <div class="col-lg-4">
+        <div class="card chart-card h-100">
+          <div class="card-header"><h6 class="mb-0"><i data-feather="pie-chart" class="me-2"></i>By Status</h6></div>
+          <div class="card-body"><div id="statusChart" style="min-height: 220px"></div></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card chart-card h-100">
+          <div class="card-header"><h6 class="mb-0"><i data-feather="bar-chart" class="me-2"></i>By Type</h6></div>
+          <div class="card-body"><div id="typeChart" style="min-height: 220px"></div></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card chart-card h-100">
+          <div class="card-header"><h6 class="mb-0"><i data-feather="target" class="me-2"></i>By Priority</h6></div>
+          <div class="card-body"><div id="priorityChart" style="min-height: 220px"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Latest Orders + Inventory Stock -->
+    <div class="row g-4">
+      <div class="col-xxl-6">
+        <div class="card chart-card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Latest Orders</h5>
+            <a href="{% url 'tracker:orders_list' %}" class="btn btn-sm btn-outline-primary"><i data-feather="external-link" class="me-1"></i>View All</a>
+          </div>
+          <div class="card-body pt-0">
+            {% if recent_orders %}
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Order</th>
+                      <th>Customer</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th>Priority</th>
+                      <th>Vehicle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for o in recent_orders %}
+                      <tr>
+                        <td>
+                          <a href="{% url 'tracker:order_detail' o.id %}" class="fw-semibold text-decoration-none">{{ o.order_number }}</a>
+                          <div class="text-muted small">{{ o.created_at|date:"M d, H:i" }}</div>
+                        </td>
+                        <td>
+                          <a href="{% url 'tracker:customer_detail' o.customer.id %}" class="text-decoration-none">{{ o.customer.full_name }}</a>
+                          <div class="text-muted small">{{ o.customer.phone }}</div>
+                        </td>
+                        <td><span class="badge bg-light text-dark">{{ o.get_type_display }}</span></td>
+                        <td><span class="status-badge status-{{ o.status }}">{{ o.get_status_display }}</span></td>
+                        <td><span class="priority-badge priority-{{ o.priority }}">{{ o.get_priority_display }}</span></td>
+                        <td>
+                          {% if o.vehicle %}
+                            <strong>{{ o.vehicle.plate_number }}</strong>
+                            <div class="text-muted small">{{ o.vehicle.make }} {{ o.vehicle.model }}</div>
+                          {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-center py-5">
+                <i data-feather="inbox" class="feather-48 text-muted mb-3"></i>
+                <h6 class="text-muted">No Recent Orders</h6>
+                <p class="text-muted mb-3">Start by creating your first order</p>
+                <a href="{% url 'tracker:order_start' %}" class="btn btn-primary"><i data-feather="plus" class="me-1"></i>Create Order</a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xxl-6">
+        <div class="card chart-card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Inventory Stock</h5>
+            <div class="d-flex gap-2">
+              <span class="text-muted small d-none d-md-inline">Total Units: <strong>{{ total_stock|default:0 }}</strong></span>
+              {% if can_manage_inventory %}
+                <a href="{% url 'tracker:inventory_list' %}" class="btn btn-sm btn-outline-primary"><i data-feather="settings" class="me-1"></i>Manage</a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="card-body pt-0">
+            {% if inventory_preview %}
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Item</th>
+                      <th>Brand</th>
+                      <th class="text-end">Qty</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for i in inventory_preview %}
+                      {% with i.quantity as q %}
+                      <tr>
+                        <td class="fw-semibold">{{ i.name }}</td>
+                        <td class="text-muted">{% if i.brand %}{{ i.brand }}{% else %}-{% endif %}</td>
+                        <td class="text-end fw-semibold">{{ q }}</td>
+                        <td>
+                          {% if q == 0 %}
+                            <span class="stock-out d-inline-flex align-items-center gap-1"><i data-feather="alert-triangle" class="feather-14"></i>Out</span>
+                          {% elif q <= 5 %}
+                            <span class="stock-low d-inline-flex align-items-center gap-1"><i data-feather="trending-down" class="feather-14"></i>Low</span>
+                          {% else %}
+                            <span class="stock-ok d-inline-flex align-items-center gap-1"><i data-feather="check-circle" class="feather-14"></i>OK</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                      {% endwith %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-center py-4">
+                <i data-feather="package" class="feather-32 text-muted mb-2"></i>
+                <p class="text-muted mb-2">No inventory items</p>
+                {% if can_manage_inventory %}
+                  <a href="{% url 'tracker:inventory_create' %}" class="btn btn-sm btn-outline-primary"><i data-feather="plus" class="me-1"></i>Add Items</a>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/animation/wow/wow.min.js' %}"></script>
+<script src="{% static 'js/notify/bootstrap-notify.min.js' %}"></script>
+<script id="chartsdata" type="application/json">{{ charts_json|safe }}</script>
+<script>
+(function(){
+  'use strict';
+  // WOW
+  if (window.WOW) new WOW().init();
+
+  // Floating particles background (lightweight)
+  const cvs = document.getElementById('dashboardParticles');
+  if (cvs) {
+    const ctx = cvs.getContext('2d');
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    let particles = [];
+    let width = 0, height = 0, rafId;
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--theme-deafult') || '#006666';
+
+    function resize(){
+      const parent = cvs.parentElement;
+      width = parent.clientWidth; height = parent.clientHeight;
+      cvs.width = Math.floor(width * DPR); cvs.height = Math.floor(height * DPR);
+      cvs.style.width = width + 'px'; cvs.style.height = height + 'px';
+      ctx.setTransform(DPR,0,0,DPR,0,0);
+      const count = Math.max(24, Math.floor((width*height)/12000));
+      if (particles.length === 0) {
+        for (let i=0;i<count;i++) particles.push(spawn());
+      } else if (particles.length < count) {
+        for (let i=particles.length;i<count;i++) particles.push(spawn());
+      } else if (particles.length > count) {
+        particles.length = count;
+      }
+    }
+    function spawn(){
+      const r = 1 + Math.random()*2.5;
+      return {
+        x: Math.random()*width,
+        y: Math.random()*height,
+        vx: (Math.random()-.5)*0.35,
+        vy: (Math.random()-.5)*0.35,
+        r
+      };
+    }
+    function step(){
+      ctx.clearRect(0,0,width,height);
+      ctx.globalAlpha = .45; ctx.fillStyle = color.trim();
+      for (let p of particles){
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < -10) p.x = width+10; if (p.x > width+10) p.x = -10;
+        if (p.y < -10) p.y = height+10; if (p.y > height+10) p.y = -10;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+      }
+      // subtle connections
+      ctx.globalAlpha = .10; ctx.strokeStyle = color.trim();
+      for (let i=0;i<particles.length;i++){
+        for (let j=i+1;j<particles.length;j++){
+          const a = particles[i], b = particles[j];
+          const dx = a.x-b.x, dy = a.y-b.y, d2 = dx*dx+dy*dy;
+          if (d2 < 120*120){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+        }
+      }
+      rafId = requestAnimationFrame(step);
+    }
+    const ro = new ResizeObserver(()=>{ resize(); }); ro.observe(cvs.parentElement);
+    resize(); step();
+    document.addEventListener('visibilitychange', ()=>{
+      if (document.hidden) cancelAnimationFrame(rafId); else step();
+    });
+  }
+
+  // Welcome toast (once)
+  setTimeout(() => {
+    try {
+      if ($.notify) {
+        $.notify({ message: 'Welcome back, {{ request.user.first_name|default:request.user.username }}! 🎉' }, {
+          type: 'info', delay: 3000, placement: { from: 'top', align: 'right' },
+          animate: { enter: 'animated fadeInDown', exit: 'animated fadeOutUp' }
+        });
+      }
+    } catch(_){}
+  }, 800);
+
+  // Charts
+  const dataEl = document.getElementById('chartsdata');
+  if (!dataEl || !window.ApexCharts) { if (window.feather) feather.replace(); return; }
+  try {
+    const data = JSON.parse(dataEl.textContent || '{}');
+    const donut = (labels, series, colors)=>({
+      chart: { type: 'donut', height: 220, fontFamily: 'inherit' },
+      labels, series,
+      colors: colors || ['#17a2b8','#ffc107','#28a745','#007bff','#dc3545'],
+      legend: { position: 'bottom', fontSize: '12px', fontFamily: 'inherit' },
+      dataLabels: { enabled: true, formatter: v => Math.round(v) + '%' },
+      plotOptions: { pie: { donut: { size: '60%' } } }, stroke: { width: 0 }
+    });
+
+    if (data.status && document.querySelector('#statusChart'))
+      new ApexCharts(document.querySelector('#statusChart'), donut(data.status.labels, data.status.values)).render();
+    if (data.type && document.querySelector('#typeChart'))
+      new ApexCharts(document.querySelector('#typeChart'), donut(data.type.labels, data.type.values, ['#28a745','#fd7e14','#6f42c1'])).render();
+    if (data.priority && document.querySelector('#priorityChart'))
+      new ApexCharts(document.querySelector('#priorityChart'), donut(data.priority.labels, data.priority.values, ['#17a2b8','#28a745','#ffc107','#dc3545'])).render();
+
+    if (data.trend && document.querySelector('#trendChart')) {
+      new ApexCharts(document.querySelector('#trendChart'), {
+        chart: { type: 'area', height: 280, fontFamily: 'inherit', toolbar: { show: false } },
+        series: [{ name: 'Orders', data: data.trend.values || [] }],
+        xaxis: { categories: data.trend.labels || [], labels: { rotate: -45, style: { fontSize: '10px' } } },
+        yaxis: { labels: { style: { fontSize: '10px' } } },
+        dataLabels: { enabled: false }, stroke: { curve: 'smooth', width: 2 },
+        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: .35, opacityTo: .1 } },
+        colors: ['var(--theme-deafult)'], grid: { borderColor: '#f1f1f1', strokeDashArray: 4 }
+      }).render();
+    }
+  } catch(e) { console.warn('Charts init error', e); }
+
+  if (window.feather) feather.replace();
+})();
+</script>
+{% endblock %}

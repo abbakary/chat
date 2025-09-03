@@ -1,0 +1,667 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}Order {{ order.order_number }} - Details{% endblock %}
+
+{% block extra_css %}
+<style>
+  .order-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+  .workflow-steps {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+  .workflow-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+  }
+  .workflow-step:not(:last-child)::after {
+    content: '→';
+    position: absolute;
+    right: -0.75rem;
+    color: #6c757d;
+    font-weight: bold;
+  }
+  .step-badge {
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .step-created { background: #e3f2fd; color: #1976d2; }
+  .step-assigned { background: #fff3e0; color: #f57c00; }
+  .step-in_progress { background: #e8f5e8; color: #388e3c; }
+  .step-completed { background: #e8f5e8; color: #2e7d32; }
+  .step-cancelled { background: #ffebee; color: #d32f2f; }
+  .step-active { 
+    background: var(--bs-primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+  }
+  
+  .detail-card {
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+  .detail-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .info-row {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f8f9fa;
+  }
+  .info-row:last-child {
+    border-bottom: none;
+  }
+  .info-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.25rem;
+  }
+  .info-value {
+    color: #6c757d;
+  }
+  .priority-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .priority-low { background: #e3f2fd; color: #1976d2; }
+  .priority-normal { background: #e8f5e8; color: #388e3c; }
+  .priority-high { background: #fff3e0; color: #f57c00; }
+  .priority-urgent { background: #ffebee; color: #d32f2f; }
+  
+  .type-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  .type-service { background: #e8f5e8; color: #2e7d32; }
+  .type-sales { background: #fff3e0; color: #f57c00; }
+  .type-consultation { background: #e3f2fd; color: #1976d2; }
+  
+  .customer-card {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  .customer-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2rem;
+  }
+  .vehicle-info {
+    background: #fff;
+    border-radius: 6px;
+    padding: 0.75rem;
+    border-left: 4px solid var(--bs-primary);
+  }
+  .status-timeline {
+    position: relative;
+    padding-left: 2rem;
+  }
+  .status-timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+    padding-left: 1rem;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -18px;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid #dee2e6;
+  }
+  .timeline-item.active::before {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary);
+  }
+  .action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .print-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Order Header -->
+  <div class="order-header card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h3 class="mb-2">Order {{ order.order_number }}</h3>
+          <div class="d-flex align-items-center gap-3">
+            <div class="type-indicator type-{{ order.type }}">
+              {% if order.type == 'service' %}
+                <i data-feather="tool"></i>
+              {% elif order.type == 'sales' %}
+                <i data-feather="shopping-cart"></i>
+              {% else %}
+                <i data-feather="message-circle"></i>
+              {% endif %}
+              {{ order.get_type_display }}
+            </div>
+            <span class="priority-badge priority-{{ order.priority }}">
+              {{ order.get_priority_display }} Priority
+            </span>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-light" href="{% url 'tracker:orders_list' %}">
+            <i data-feather="arrow-left" class="me-1"></i>Back to Orders
+          </a>
+          <a class="btn btn-light" href="{% url 'tracker:customer_detail' order.customer.id %}">
+            <i data-feather="user" class="me-1"></i>View Customer
+          </a>
+          <button class="btn btn-warning" onclick="window.print()">
+            <i data-feather="printer" class="me-1"></i>Print
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workflow Status -->
+  <div class="workflow-steps">
+    <div class="workflow-step">
+      <div class="step-badge step-created {% if order.status == 'created' %}step-active{% endif %}">
+        <i data-feather="clipboard" class="feather-14 me-1"></i>Created
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="step-badge step-assigned {% if order.status == 'assigned' %}step-active{% endif %}">
+        <i data-feather="user-check" class="feather-14 me-1"></i>Assigned
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="step-badge step-in_progress {% if order.status == 'in_progress' %}step-active{% endif %}">
+        <i data-feather="activity" class="feather-14 me-1"></i>In Progress
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="step-badge {% if order.status == 'completed' %}step-completed step-active{% elif order.status == 'cancelled' %}step-cancelled step-active{% else %}step-created{% endif %}">
+        {% if order.status == 'completed' %}
+          <i data-feather="check-circle" class="feather-14 me-1"></i>Completed
+        {% elif order.status == 'cancelled' %}
+          <i data-feather="x-circle" class="feather-14 me-1"></i>Cancelled
+        {% else %}
+          <i data-feather="clock" class="feather-14 me-1"></i>Pending
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Main Order Details -->
+    <div class="col-lg-8">
+      <!-- Customer Information -->
+      <div class="detail-card card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i data-feather="user" class="me-2"></i>Customer Information
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="customer-card">
+            <div class="d-flex align-items-center gap-3">
+              <div class="customer-avatar">
+                {{ order.customer.full_name|first|upper }}
+              </div>
+              <div class="flex-grow-1">
+                <h6 class="mb-1">
+                  <a href="{% url 'tracker:customer_detail' order.customer.id %}" class="text-decoration-none">
+                    {{ order.customer.full_name }}
+                  </a>
+                </h6>
+                <div class="d-flex align-items-center gap-3">
+                  <div>
+                    <i data-feather="phone" class="feather-14 me-1"></i>
+                    <a href="tel:{{ order.customer.phone }}" class="text-decoration-none">{{ order.customer.phone }}</a>
+                  </div>
+                  {% if order.customer.email %}
+                  <div>
+                    <i data-feather="mail" class="feather-14 me-1"></i>
+                    <a href="mailto:{{ order.customer.email }}" class="text-decoration-none">{{ order.customer.email }}</a>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="text-end">
+                <small class="text-muted">Customer Code</small>
+                <div class="fw-semibold">{{ order.customer.customer_code|default:order.customer.code }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Details -->
+      <div class="detail-card card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i data-feather="clipboard" class="me-2"></i>Order Details
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="info-row">
+                <div class="info-label">Order Number</div>
+                <div class="info-value fw-bold">{{ order.order_number }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="info-row">
+                <div class="info-label">Order Type</div>
+                <div class="info-value">{{ order.get_type_display }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="info-row">
+                <div class="info-label">Current Status</div>
+                <div class="info-value">
+                  <span class="badge step-{{ order.status }}">{{ order.get_status_display }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="info-row">
+                <div class="info-label">Priority Level</div>
+                <div class="info-value">
+                  <span class="priority-badge priority-{{ order.priority }}">{{ order.get_priority_display }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="info-row">
+                <div class="info-label">Created Date</div>
+                <div class="info-value">{{ order.created_at|date:"F d, Y \a\t H:i" }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="info-row">
+                <div class="info-label">Last Updated</div>
+                <div class="info-value">{{ order.updated_at|date:"F d, Y \a\t H:i" }}</div>
+              </div>
+            </div>
+            {% if order.completed_at %}
+            <div class="col-md-6">
+              <div class="info-row">
+                <div class="info-label">Completed Date</div>
+                <div class="info-value text-success">{{ order.completed_at|date:"F d, Y \a\t H:i" }}</div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicle Information -->
+      {% if order.vehicle %}
+      <div class="detail-card card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i data-feather="truck" class="me-2"></i>Vehicle Information
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="vehicle-info">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <div class="info-label">Plate Number</div>
+                <div class="info-value fw-bold">{{ order.vehicle.plate_number }}</div>
+              </div>
+              <div class="col-md-3">
+                <div class="info-label">Make & Model</div>
+                <div class="info-value">{{ order.vehicle.make }} {{ order.vehicle.model }}</div>
+              </div>
+              <div class="col-md-3">
+                <div class="info-label">Vehicle Type</div>
+                <div class="info-value">{{ order.vehicle.get_vehicle_type_display }}</div>
+              </div>
+              <div class="col-md-3">
+                <div class="info-label">Year</div>
+                <div class="info-value">{{ order.vehicle.year|default:'N/A' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Service/Sales/Consultation Details -->
+      <div class="detail-card card">
+        <div class="card-header">
+          <h5 class="mb-0">
+            {% if order.type == 'service' %}
+              <i data-feather="tool" class="me-2"></i>Service Details
+            {% elif order.type == 'sales' %}
+              <i data-feather="shopping-cart" class="me-2"></i>Sales Details
+            {% else %}
+              <i data-feather="message-circle" class="me-2"></i>Consultation Details
+            {% endif %}
+          </h5>
+        </div>
+        <div class="card-body">
+          {% if order.type == 'service' %}
+            <div class="row g-3">
+              {% if order.service_selection %}
+              <div class="col-12">
+                <div class="info-label">Services Requested</div>
+                <div class="info-value">
+                  {% for service in order.service_selection %}
+                    <span class="badge bg-light text-dark me-1">{{ service }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+              <div class="col-12">
+                <div class="info-label">Problem Description</div>
+                <div class="info-value">{{ order.description|linebreaksbr|default:'No description provided' }}</div>
+              </div>
+              {% if order.estimated_duration %}
+              <div class="col-md-6">
+                <div class="info-label">Estimated Duration</div>
+                <div class="info-value">{{ order.estimated_duration }} minutes</div>
+              </div>
+              {% endif %}
+            </div>
+
+          {% elif order.type == 'sales' %}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="info-label">Item Name</div>
+                <div class="info-value fw-semibold">{{ order.item_name|default:'Not specified' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="info-label">Brand</div>
+                <div class="info-value">{{ order.brand|default:'Not specified' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="info-label">Quantity</div>
+                <div class="info-value">{{ order.quantity|default:'Not specified' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="info-label">Condition</div>
+                <div class="info-value">{{ order.tire_type|default:'Not specified' }}</div>
+              </div>
+              {% if order.unit_price %}
+              <div class="col-md-6">
+                <div class="info-label">Unit Price</div>
+                <div class="info-value">{{ order.unit_price }}</div>
+              </div>
+              {% endif %}
+              {% if order.total_amount %}
+              <div class="col-md-6">
+                <div class="info-label">Total Amount</div>
+                <div class="info-value fw-bold text-success">{{ order.total_amount }}</div>
+              </div>
+              {% endif %}
+            </div>
+
+          {% else %}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="info-label">Inquiry Type</div>
+                <div class="info-value">{{ order.inquiry_type|default:'General inquiry' }}</div>
+              </div>
+              <div class="col-md-6">
+                <div class="info-label">Contact Preference</div>
+                <div class="info-value">{{ order.contact_preference|default:'Not specified' }}</div>
+              </div>
+              <div class="col-12">
+                <div class="info-label">Questions/Comments</div>
+                <div class="info-value">{{ order.questions|linebreaksbr|default:'No questions provided' }}</div>
+              </div>
+              {% if order.follow_up_date %}
+              <div class="col-md-6">
+                <div class="info-label">Follow-up Date</div>
+                <div class="info-value">{{ order.follow_up_date|date:"F d, Y" }}</div>
+              </div>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Panel -->
+    <div class="col-lg-4">
+      <!-- Status Update -->
+      <div class="detail-card card mb-4" id="status">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i data-feather="refresh-ccw" class="me-2"></i>Update Order Status
+          </h6>
+        </div>
+        <div class="card-body">
+          <form method="post" action="{% url 'tracker:update_order_status' order.id %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">Current Status</label>
+              <select class="form-select" name="status">
+                {% for k, v in order.STATUS_CHOICES %}
+                  <option value="{{ k }}" {% if order.status == k %}selected{% endif %}>{{ v }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Update Notes (Optional)</label>
+              <textarea class="form-control" name="notes" rows="3" placeholder="Add any notes about this status change..."></textarea>
+            </div>
+            <button class="btn btn-primary w-100" type="submit">
+              <i data-feather="save" class="me-1"></i>Update Status
+            </button>
+          </form>
+          
+          {% if order.status == 'completed' %}
+          <hr>
+          <div class="text-center">
+            <button class="btn btn-success w-100" onclick="window.print()">
+              <i data-feather="printer" class="me-1"></i>Print Receipt
+            </button>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="detail-card card mb-4">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i data-feather="zap" class="me-2"></i>Quick Actions
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="action-buttons">
+            <a href="{% url 'tracker:customer_detail' order.customer.id %}" class="btn btn-outline-primary btn-sm">
+              <i data-feather="user" class="me-1"></i>View Customer
+            </a>
+            <a href="{% url 'tracker:create_order_for_customer' order.customer.id %}" class="btn btn-outline-success btn-sm">
+              <i data-feather="plus" class="me-1"></i>New Order
+            </a>
+            {% if order.customer.phone %}
+            <a href="tel:{{ order.customer.phone }}" class="btn btn-outline-info btn-sm">
+              <i data-feather="phone" class="me-1"></i>Call Customer
+            </a>
+            {% endif %}
+            {% if order.customer.email %}
+            <a href="mailto:{{ order.customer.email }}" class="btn btn-outline-warning btn-sm">
+              <i data-feather="mail" class="me-1"></i>Email Customer
+            </a>
+            {% endif %}
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+              <i data-feather="printer" class="me-1"></i>Print Details
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Timeline -->
+      <div class="detail-card card">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i data-feather="clock" class="me-2"></i>Order Timeline
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="status-timeline">
+            <div class="timeline-item active">
+              <div class="fw-semibold">Order Created</div>
+              <div class="text-muted small">{{ order.created_at|date:"M d, Y \a\t H:i" }}</div>
+            </div>
+            
+            {% if order.assigned_at %}
+            <div class="timeline-item {% if order.status in 'assigned,in_progress,completed' %}active{% endif %}">
+              <div class="fw-semibold">Order Assigned</div>
+              <div class="text-muted small">{{ order.assigned_at|date:"M d, Y \a\t H:i" }}</div>
+            </div>
+            {% endif %}
+            
+            {% if order.started_at %}
+            <div class="timeline-item {% if order.status in 'in_progress,completed' %}active{% endif %}">
+              <div class="fw-semibold">Work Started</div>
+              <div class="text-muted small">{{ order.started_at|date:"M d, Y \a\t H:i" }}</div>
+            </div>
+            {% endif %}
+            
+            {% if order.completed_at %}
+            <div class="timeline-item active">
+              <div class="fw-semibold text-success">Order Completed</div>
+              <div class="text-muted small">{{ order.completed_at|date:"M d, Y \a\t H:i" }}</div>
+            </div>
+            {% elif order.status == 'cancelled' %}
+            <div class="timeline-item active">
+              <div class="fw-semibold text-danger">Order Cancelled</div>
+              <div class="text-muted small">{{ order.updated_at|date:"M d, Y \a\t H:i" }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Print Receipt Section -->
+  <div class="print-section d-print-block d-none" id="print">
+    <div class="text-center mb-4">
+      <h2>Car Service Receipt</h2>
+      <h4>Order #{{ order.order_number }}</h4>
+    </div>
+    <div class="row">
+      <div class="col-6">
+        <strong>Customer:</strong> {{ order.customer.full_name }}<br>
+        <strong>Phone:</strong> {{ order.customer.phone }}<br>
+        {% if order.customer.email %}<strong>Email:</strong> {{ order.customer.email }}<br>{% endif %}
+      </div>
+      <div class="col-6 text-end">
+        <strong>Date:</strong> {{ order.created_at|date:"F d, Y" }}<br>
+        <strong>Status:</strong> {{ order.get_status_display }}<br>
+        <strong>Type:</strong> {{ order.get_type_display }}<br>
+      </div>
+    </div>
+    <hr>
+    <!-- Receipt details would go here -->
+    <div class="text-center mt-4">
+      <small>Thank you for choosing our service!</small>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  'use strict';
+  
+  // Auto-refresh for in-progress orders
+  {% if order.status == 'in_progress' %}
+  setInterval(() => {
+    // Optional: Auto-refresh page for live updates
+    // location.reload();
+  }, 300000); // Every 5 minutes
+  {% endif %}
+
+  // Status update confirmation
+  const statusForm = document.querySelector('form[action*="update_order_status"]');
+  if (statusForm) {
+    statusForm.addEventListener('submit', function(e) {
+      const newStatus = this.querySelector('select[name="status"]').value;
+      const orderNumber = '{{ order.order_number }}';
+      
+      if (newStatus === 'cancelled') {
+        if (!confirm(`Are you sure you want to cancel order ${orderNumber}?`)) {
+          e.preventDefault();
+          return false;
+        }
+      } else if (newStatus === 'completed') {
+        if (!confirm(`Mark order ${orderNumber} as completed?`)) {
+          e.preventDefault();
+          return false;
+        }
+      }
+    });
+  }
+
+  // Print functionality
+  window.addEventListener('beforeprint', function() {
+    document.title = 'Order {{ order.order_number }} - Receipt';
+  });
+
+  window.addEventListener('afterprint', function() {
+    document.title = 'Order {{ order.order_number }} - Details';
+  });
+
+  // Initialize feather icons
+  if (window.feather) {
+    feather.replace();
+  }
+
+})();
+</script>
+{% endblock %}

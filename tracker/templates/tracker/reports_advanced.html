@@ -1,0 +1,152 @@
+{% extends 'tracker/base.html' %}
+{%load static%}
+{% block title %}Advanced Reports{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/js-datatables/style.css' %}">
+<link rel="stylesheet" href="{% static 'css/datatables.css' %}">
+{% endblock %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Advanced Reports</h4>
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'tracker:reports_export' %}?from={{ start_date }}&to={{ end_date }}&type=all">Export CSV</a>
+  </div>
+
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-sm-3">
+      <select name="period" class="form-select">
+        <option value="daily" {% if period == 'daily' %}selected{% endif %}>Daily</option>
+        <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>Weekly</option>
+        <option value="monthly" {% if period == 'monthly' %}selected{% endif %}>Monthly</option>
+        <option value="yearly" {% if period == 'yearly' %}selected{% endif %}>Yearly</option>
+      </select>
+    </div>
+    <div class="col-sm-3">
+      <select name="type" class="form-select">
+        <option value="overview" {% if report_type == 'overview' %}selected{% endif %}>Overview</option>
+        <option value="customers" {% if report_type == 'customers' %}selected{% endif %}>Customers</option>
+        <option value="inquiries" {% if report_type == 'inquiries' %}selected{% endif %}>Inquiries</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-outline-primary" type="submit">Apply</button>
+    </div>
+  </form>
+
+  <div class="row g-3">
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">Total Orders</div><div class="display-6">{{ stats.total_orders }}</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">Completed</div><div class="display-6">{{ stats.completed_orders }}</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">Pending</div><div class="display-6">{{ stats.pending_orders }}</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">Avg Duration</div><div class="display-6">{{ stats.avg_duration }}m</div></div></div></div>
+  </div>
+
+  <div class="row g-3 mt-3">
+    <div class="col-lg-6">
+      <div class="card h-100"><div class="card-header"><h6 class="mb-0">Orders Trend</h6></div><div class="card-body"><div id="trendChart"></div></div></div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100"><div class="card-header"><h6 class="mb-0">Status Breakdown</h6></div><div class="card-body"><div id="statusChart"></div></div></div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-lg-6">
+      <div class="card h-100"><div class="card-header"><h6 class="mb-0">Orders by Type</h6></div><div class="card-body"><div id="typeChart"></div></div></div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100"><div class="card-header"><h6 class="mb-0">Customers by Type</h6></div><div class="card-body"><div id="custTypeChart"></div></div></div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="table-responsive">
+      <table id="advReportsTable" class="table mb-0">
+        <thead class="table-light"><tr><th>#</th><th>Name</th><th>Info</th><th>Date</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          {% for it in data_items %}
+            <tr>
+              {% if report_type == 'customers' %}
+                <td>{{ forloop.counter }}</td>
+                <td>{{ it.full_name }}</td>
+                <td>{{ it.phone }}</td>
+                <td>{{ it.registration_date|date:'Y-m-d' }}</td>
+                <td class="text-end">
+                  <div class="dropdown action-menu">
+                    <button class="btn btn-outline-secondary btn-icon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      <i data-feather="more-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'tracker:customer_detail' it.id %}"><i data-feather="eye" class="me-2"></i>View Customer</a></li>
+                    </ul>
+                  </div>
+                </td>
+              {% elif report_type == 'inquiries' %}
+                <td>{{ it.order_number }}</td>
+                <td>{{ it.customer.full_name }}</td>
+                <td class="text-capitalize">{{ it.inquiry_type|default:'-' }}</td>
+                <td>{{ it.created_at|date:'Y-m-d' }}</td>
+                <td class="text-end">
+                  <div class="dropdown action-menu">
+                    <button class="btn btn-outline-secondary btn-icon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      <i data-feather="more-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'tracker:order_detail' it.id %}"><i data-feather="eye" class="me-2"></i>View Order</a></li>
+                      <li><a class="dropdown-item" href="{% url 'tracker:customer_detail' it.customer.id %}"><i data-feather="user" class="me-2"></i>View Customer</a></li>
+                    </ul>
+                  </div>
+                </td>
+              {% else %}
+                <td>{{ it.order_number }}</td>
+                <td>{{ it.customer.full_name }}</td>
+                <td class="text-capitalize">{{ it.type }}</td>
+                <td>{{ it.created_at|date:'Y-m-d' }}</td>
+                <td class="text-end">
+                  <div class="dropdown action-menu">
+                    <button class="btn btn-outline-secondary btn-icon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      <i data-feather="more-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li><a class="dropdown-item" href="{% url 'tracker:order_detail' it.id %}"><i data-feather="eye" class="me-2"></i>View Order</a></li>
+                      <li><a class="dropdown-item" href="{% url 'tracker:customer_detail' it.customer.id %}"><i data-feather="user" class="me-2"></i>View Customer</a></li>
+                    </ul>
+                  </div>
+                </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-center p-3">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/js-datatables/simple-datatables@latest.js' %}"></script>
+<script id="chartdata" type="application/json">{{ chart_data|safe }}</script>
+<script>
+  (function(){
+    const el = document.querySelector('#advReportsTable');
+    if (el && window.simpleDatatables) {
+      new simpleDatatables.DataTable(el, { searchable: true, perPage: 10, perPageSelect: [10,25,50,100] });
+    }
+    const dataEl = document.getElementById('chartdata');
+    if (!dataEl || !window.ApexCharts) return;
+    try{
+      const data = JSON.parse(dataEl.textContent || '{}');
+      const donut = (selector, d) => new ApexCharts(document.querySelector(selector), {
+        chart:{type:'donut', height:260, fontFamily:'inherit'}, labels:d.labels, series:d.values,
+        legend:{position:'bottom'}, dataLabels:{enabled:false}
+      }).render();
+      if (data.trend) new ApexCharts(document.querySelector('#trendChart'), {
+        chart:{type:'area', height:260, toolbar:{show:false}, fontFamily:'inherit'},
+        series:[{name:'Orders', data:data.trend.values}], xaxis:{categories:data.trend.labels},
+        dataLabels:{enabled:false}, stroke:{curve:'smooth', width:2}, fill:{type:'gradient', gradient:{opacityFrom:0.4, opacityTo:0.1}}
+      }).render();
+      if (data.status) donut('#statusChart', data.status);
+      if (data.orders) donut('#typeChart', data.orders);
+      if (data.types) donut('#custTypeChart', data.types);
+    }catch(e){ console.warn(e); }
+  })();
+</script>
+{% endblock %}

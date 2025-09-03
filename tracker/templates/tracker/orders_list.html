@@ -1,0 +1,571 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}Orders - Car Service Tracker{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/js-datatables/style.css' %}">
+<link rel="stylesheet" href="{% static 'css/datatables.css' %}">
+<style>
+  .page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+  .filters-card {
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .order-card {
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border-left: 4px solid #e9ecef;
+  }
+  .order-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+  }
+  .order-card.service { border-left-color: #28a745; }
+  .order-card.sales { border-left-color: #fd7e14; }
+  .order-card.consultation { border-left-color: #17a2b8; }
+  
+  .status-badge {
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .status-created { background: #e3f2fd; color: #1976d2; }
+  .status-assigned { background: #fff3e0; color: #f57c00; }
+  .status-in_progress { background: #e8f5e8; color: #388e3c; }
+  .status-completed { background: #e8f5e8; color: #2e7d32; }
+  .status-cancelled { background: #ffebee; color: #d32f2f; }
+  
+  .priority-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+  .priority-low { background: #e3f2fd; color: #1976d2; }
+  .priority-normal { background: #e8f5e8; color: #388e3c; }
+  .priority-high { background: #fff3e0; color: #f57c00; }
+  .priority-urgent { background: #ffebee; color: #d32f2f; }
+  
+  .type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+  .type-service { background: #e8f5e8; color: #2e7d32; }
+  .type-sales { background: #fff3e0; color: #f57c00; }
+  .type-consultation { background: #e3f2fd; color: #1976d2; }
+  
+  .order-number {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    color: #495057;
+  }
+  .customer-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .customer-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.8rem;
+  }
+  .vehicle-info {
+    background: #f8f9fa;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+  }
+  .action-menu .btn {
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .quick-status-update select {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .order-meta {
+    font-size: 0.8rem;
+    color: #6c757d;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Page Header -->
+  <div class="page-header card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h3 class="mb-2">Order Management</h3>
+          <p class="mb-0 opacity-75">Track and manage all service, sales, and consultation orders</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-light" href="{% url 'tracker:orders_export' %}?status={{ request.GET.status|default:'all' }}&type={{ request.GET.type|default:'all' }}">
+            <i data-feather="download" class="me-1"></i>Export CSV
+          </a>
+          <a class="btn btn-warning" href="{% url 'tracker:order_start' %}">
+            <i data-feather="plus-circle" class="me-1"></i>New Order
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-card card mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Status Filter</label>
+          <select name="status" class="form-select">
+            {% with s=request.GET.status|default:'all' %}
+              <option value="all" {% if s == 'all' %}selected{% endif %}>All Status</option>
+              <option value="created" {% if s == 'created' %}selected{% endif %}>📋 Created</option>
+              <option value="assigned" {% if s == 'assigned' %}selected{% endif %}>👤 Assigned</option>
+              <option value="in_progress" {% if s == 'in_progress' %}selected{% endif %}>🔧 In Progress</option>
+              <option value="completed" {% if s == 'completed' %}selected{% endif %}>✅ Completed</option>
+              <option value="cancelled" {% if s == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
+            {% endwith %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Order Type</label>
+          <select name="type" class="form-select">
+            {% with t=request.GET.type|default:'all' %}
+              <option value="all" {% if t == 'all' %}selected{% endif %}>All Types</option>
+              <option value="service" {% if t == 'service' %}selected{% endif %}>🔧 Service</option>
+              <option value="sales" {% if t == 'sales' %}selected{% endif %}>🛒 Sales</option>
+              <option value="consultation" {% if t == 'consultation' %}selected{% endif %}>💬 Consultation</option>
+            {% endwith %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Priority</label>
+          <select name="priority" class="form-select">
+            <option value="">All Priorities</option>
+            <option value="low" {% if request.GET.priority == 'low' %}selected{% endif %}>Low Priority</option>
+            <option value="normal" {% if request.GET.priority == 'normal' %}selected{% endif %}>Normal Priority</option>
+            <option value="high" {% if request.GET.priority == 'high' %}selected{% endif %}>High Priority</option>
+            <option value="urgent" {% if request.GET.priority == 'urgent' %}selected{% endif %}>🚨 Urgent</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Date Range</label>
+          <select name="date_range" class="form-select">
+            <option value="">All Dates</option>
+            <option value="today" {% if request.GET.date_range == 'today' %}selected{% endif %}>Today</option>
+            <option value="week" {% if request.GET.date_range == 'week' %}selected{% endif %}>This Week</option>
+            <option value="month" {% if request.GET.date_range == 'month' %}selected{% endif %}>This Month</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary me-2" type="submit">
+            <i data-feather="filter" class="me-1"></i>Apply Filters
+          </button>
+          <a href="{% url 'tracker:orders_list' %}" class="btn btn-outline-secondary">
+            <i data-feather="x" class="me-1"></i>Clear Filters
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Order Statistics -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-2 col-md-4 col-sm-6">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="clipboard" class="feather-24 text-primary mb-2"></i>
+          <h4 class="mb-1">{{ total_orders|default:0 }}</h4>
+          <small class="text-muted">Total Orders</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="clock" class="feather-24 text-warning mb-2"></i>
+          <h4 class="mb-1">{{ pending_orders|default:0 }}</h4>
+          <small class="text-muted">Pending</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="activity" class="feather-24 text-info mb-2"></i>
+          <h4 class="mb-1">{{ active_orders|default:0 }}</h4>
+          <small class="text-muted">In Progress</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="check-circle" class="feather-24 text-success mb-2"></i>
+          <h4 class="mb-1">{{ completed_today|default:0 }}</h4>
+          <small class="text-muted">Completed Today</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="alert-triangle" class="feather-24 text-danger mb-2"></i>
+          <h4 class="mb-1">{{ urgent_orders|default:0 }}</h4>
+          <small class="text-muted">Urgent</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="dollar-sign" class="feather-24 text-success mb-2"></i>
+          <h4 class="mb-1">{{ revenue_today|default:"0" }}</h4>
+          <small class="text-muted">Revenue Today</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders Table -->
+  <div class="card">
+    <div class="card-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <i data-feather="list" class="me-2"></i>Order List
+        </h5>
+        <div class="text-muted">
+          {% if orders %}
+            Showing {{ orders|length }} orders
+            {% if request.GET.status != 'all' and request.GET.status %}
+              ({{ request.GET.status|title }} only)
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if orders %}
+      <div class="table-responsive">
+        <table id="ordersTable" class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Order Details</th>
+              <th>Customer</th>
+              <th>Service Info</th>
+              <th>Status & Priority</th>
+              <th>Vehicle</th>
+              <th>Timing</th>
+              <th class="text-center pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for o in orders %}
+              <tr class="order-card {{ o.type }}">
+                <td class="ps-3">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2">
+                      {% if o.type == 'service' %}
+                        <i data-feather="tool" class="feather-20 text-success"></i>
+                      {% elif o.type == 'sales' %}
+                        <i data-feather="shopping-cart" class="feather-20 text-warning"></i>
+                      {% else %}
+                        <i data-feather="message-circle" class="feather-20 text-info"></i>
+                      {% endif %}
+                    </div>
+                    <div>
+                      <div class="order-number">
+                        <a href="{% url 'tracker:order_detail' o.id %}" class="text-decoration-none">
+                          {{ o.order_number }}
+                        </a>
+                      </div>
+                      <small class="text-muted">{{ o.created_at|date:"M d, H:i" }}</small>
+                    </div>
+                  </div>
+                </td>
+                
+                <td>
+                  <div class="customer-info">
+                    <div class="customer-avatar">
+                      {{ o.customer.full_name|first|upper }}
+                    </div>
+                    <div>
+                      <div class="fw-semibold">
+                        <a href="{% url 'tracker:customer_detail' o.customer.id %}" class="text-decoration-none">
+                          {{ o.customer.full_name }}
+                        </a>
+                      </div>
+                      <small class="text-muted">{{ o.customer.phone }}</small>
+                    </div>
+                  </div>
+                </td>
+                
+                <td>
+                  <span class="type-badge type-{{ o.type }}">{{ o.get_type_display }}</span>
+                  {% if o.description %}
+                    <div class="small text-muted mt-1" title="{{ o.description }}">
+                      {{ o.description|truncatechars:30 }}
+                    </div>
+                  {% endif %}
+                  {% if o.estimated_duration %}
+                    <div class="small text-muted">
+                      <i data-feather="clock" class="feather-12"></i> {{ o.estimated_duration }}min
+                    </div>
+                  {% endif %}
+                </td>
+                
+                <td>
+                  <span class="status-badge status-{{ o.status }}">{{ o.get_status_display }}</span>
+                  <br>
+                  <span class="priority-badge priority-{{ o.priority }}">{{ o.get_priority_display }}</span>
+                </td>
+                
+                <td>
+                  {% if o.vehicle %}
+                    <div class="vehicle-info">
+                      <strong>{{ o.vehicle.plate_number }}</strong>
+                      <div class="small text-muted">{{ o.vehicle.make }} {{ o.vehicle.model }}</div>
+                    </div>
+                  {% else %}
+                    <span class="text-muted">No vehicle</span>
+                  {% endif %}
+                </td>
+                
+                <td>
+                  <div class="order-meta">
+                    <div><strong>Created:</strong> {{ o.created_at|date:"M d, H:i" }}</div>
+                    {% if o.updated_at != o.created_at %}
+                      <div><strong>Updated:</strong> {{ o.updated_at|date:"M d, H:i" }}</div>
+                    {% endif %}
+                    {% if o.status == 'completed' and o.completed_at %}
+                      <div class="text-success"><strong>Completed:</strong> {{ o.completed_at|date:"M d, H:i" }}</div>
+                    {% endif %}
+                  </div>
+                </td>
+                
+                <td class="text-center pe-3">
+                  <div class="d-flex justify-content-center align-items-center gap-2">
+                    <!-- Quick Status Update -->
+                    <div class="quick-status-update">
+                      <form method="post" action="{% url 'tracker:update_order_status' o.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                          {% for k,v in o.STATUS_CHOICES %}
+                            <option value="{{ k }}" {% if o.status == k %}selected{% endif %}>{{ v }}</option>
+                          {% endfor %}
+                        </select>
+                      </form>
+                    </div>
+                    
+                    <!-- Action Menu -->
+                    <div class="dropdown action-menu">
+                      <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                              type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i data-feather="more-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                          <a class="dropdown-item" href="{% url 'tracker:order_detail' o.id %}">
+                            <i data-feather="eye" class="me-2 feather-14"></i>View Details
+                          </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'tracker:order_detail' o.id %}#status">
+                            <i data-feather="refresh-ccw" class="me-2 feather-14"></i>Update Status
+                          </a>
+                        </li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'tracker:order_detail' o.id %}#notes">
+                            <i data-feather="edit-3" class="me-2 feather-14"></i>Add Notes
+                          </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'tracker:customer_detail' o.customer.id %}">
+                            <i data-feather="user" class="me-2 feather-14"></i>View Customer
+                          </a>
+                        </li>
+                        {% if o.customer.phone %}
+                        <li>
+                          <a class="dropdown-item" href="tel:{{ o.customer.phone }}">
+                            <i data-feather="phone" class="me-2 feather-14"></i>Call Customer
+                          </a>
+                        </li>
+                        {% endif %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                          <a class="dropdown-item text-primary" href="{% url 'tracker:order_detail' o.id %}#print">
+                            <i data-feather="printer" class="me-2 feather-14"></i>Print Receipt
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Footer -->
+      <div class="card-footer">
+        <div class="d-flex justify-content-between align-items-center">
+          <small class="text-muted">
+            Total: {{ orders|length }} order{{ orders|length|pluralize }}
+            {% if request.GET.status and request.GET.status != 'all' %}
+              with {{ request.GET.status }} status
+            {% endif %}
+          </small>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+              <i data-feather="printer" class="me-1"></i>Print List
+            </button>
+            <a href="{% url 'tracker:orders_export' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-outline-primary">
+              <i data-feather="download" class="me-1"></i>Export Data
+            </a>
+          </div>
+        </div>
+      </div>
+
+    {% else %}
+      <div class="card-body text-center py-5">
+        <i data-feather="clipboard" class="feather-48 text-muted mb-3"></i>
+        <h5 class="text-muted">No Orders Found</h5>
+        <p class="text-muted mb-4">
+          {% if request.GET.status or request.GET.type or request.GET.priority %}
+            No orders match your current filters.
+          {% else %}
+            You don't have any orders yet.
+          {% endif %}
+        </p>
+        <div class="d-flex gap-2 justify-content-center">
+          {% if request.GET.status or request.GET.type or request.GET.priority %}
+            <a href="{% url 'tracker:orders_list' %}" class="btn btn-outline-secondary">
+              <i data-feather="x" class="me-1"></i>Clear Filters
+            </a>
+          {% endif %}
+          <a href="{% url 'tracker:order_start' %}" class="btn btn-primary">
+            <i data-feather="plus-circle" class="me-1"></i>Create First Order
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/js-datatables/simple-datatables@latest.js' %}"></script>
+<script>
+(function(){
+  'use strict';
+  
+  // Initialize DataTable
+  const tableEl = document.querySelector('#ordersTable');
+  if (tableEl && window.simpleDatatables && tableEl.querySelector('tbody tr')) {
+    try {
+      new simpleDatatables.DataTable(tableEl, {
+        searchable: true,
+        perPage: 25,
+        perPageSelect: [10, 25, 50, 100],
+        labels: {
+          placeholder: "Search orders...",
+          noRows: "No orders found",
+          info: "Showing {start} to {end} of {rows} orders"
+        },
+        layout: {
+          top: "{select}{search}",
+          bottom: "{info}{pager}"
+        },
+        columns: [
+          { select: 0, sort: "desc" }, // Sort by order details (newest first)
+          { select: 6, searchable: false } // Actions column not searchable
+        ]
+      });
+    } catch(e) {
+      console.warn('DataTable initialization error:', e);
+    }
+  }
+
+  // Auto-refresh for in-progress orders
+  const inProgressOrders = document.querySelectorAll('.status-in_progress');
+  if (inProgressOrders.length > 0) {
+    setInterval(() => {
+      // Optional: Auto-refresh page if there are in-progress orders
+      // location.reload();
+    }, 300000); // Every 5 minutes
+  }
+
+  // Status update confirmation
+  const statusSelects = document.querySelectorAll('.quick-status-update select');
+  statusSelects.forEach(select => {
+    const originalValue = select.value;
+    select.addEventListener('change', function(e) {
+      const newStatus = e.target.value;
+      const orderNumber = e.target.closest('tr').querySelector('.order-number a').textContent;
+      
+      if (newStatus === 'cancelled') {
+        if (!confirm(`Are you sure you want to cancel order ${orderNumber}?`)) {
+          e.target.value = originalValue;
+          return false;
+        }
+      } else if (newStatus === 'completed') {
+        if (!confirm(`Mark order ${orderNumber} as completed?`)) {
+          e.target.value = originalValue;
+          return false;
+        }
+      }
+    });
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + N for new order
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      window.location.href = "{% url 'tracker:order_start' %}";
+    }
+    
+    // Ctrl/Cmd + F for focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      e.preventDefault();
+      const searchInput = document.querySelector('.datatable-input');
+      if (searchInput) {
+        searchInput.focus();
+      }
+    }
+  });
+
+  // Initialize feather icons
+  if (window.feather) {
+    feather.replace();
+  }
+
+})();
+</script>
+{% endblock %}

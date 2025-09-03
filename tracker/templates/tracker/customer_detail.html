@@ -1,0 +1,584 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}{{ customer.full_name }} - Customer Details{% endblock %}
+
+{% block extra_css %}
+<style>
+  .customer-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+  .customer-avatar-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+  }
+  .status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+  }
+  .status-active { background: #28a745; }
+  .status-inactive { background: #6c757d; }
+  .status-here { background: #17a2b8; animation: pulse 2s infinite; }
+  
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+  }
+  
+  .info-card {
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+  .info-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .stat-box {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+  .stat-box:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+  }
+  .contact-button {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.25rem;
+  }
+  .order-timeline {
+    position: relative;
+    padding-left: 2rem;
+  }
+  .order-timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+  }
+  .order-timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+  }
+  .order-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -23px;
+    top: 8px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid #dee2e6;
+  }
+  .order-timeline-item.completed::before { border-color: #28a745; }
+  .order-timeline-item.in-progress::before { border-color: #ffc107; }
+  .order-timeline-item.cancelled::before { border-color: #dc3545; }
+  
+  .vehicle-card {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .customer-type-badge {
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .type-personal { background: #e3f2fd; color: #1976d2; }
+  .type-government { background: #e8f5e8; color: #388e3c; }
+  .type-ngo { background: #fff3e0; color: #f57c00; }
+  .type-company { background: #f3e5f5; color: #7b1fa2; }
+  
+  .order-card {
+    border-left: 4px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+  .order-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .order-card.service { border-left-color: #28a745; }
+  .order-card.sales { border-left-color: #fd7e14; }
+  .order-card.consultation { border-left-color: #17a2b8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Customer Header -->
+  <div class="customer-header card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex align-items-start gap-3">
+          <div class="customer-avatar-large">
+            {{ customer.full_name|first|upper }}
+          </div>
+          <div>
+            <h3 class="mb-2">{{ customer.full_name }}</h3>
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <span class="status-indicator {% if customer.arrival_time %}status-here{% elif customer.total_visits > 0 %}status-active{% else %}status-inactive{% endif %}"></span>
+              <span class="badge bg-light text-dark">
+                {% if customer.arrival_time %}
+                  Currently Here
+                {% elif customer.total_visits > 0 %}
+                  Active Customer
+                {% else %}
+                  New Customer
+                {% endif %}
+              </span>
+              <span class="customer-type-badge type-{{ customer.customer_type|default:'personal' }}">
+                {{ customer.customer_type|default:'Personal'|title }} Customer
+              </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <i data-feather="phone" class="feather-16"></i>
+              <span>{{ customer.phone }}</span>
+              {% if customer.email %}
+                <span class="mx-2">•</span>
+                <i data-feather="mail" class="feather-16"></i>
+                <span>{{ customer.email }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        
+        <div class="d-flex flex-column gap-2">
+          <div class="d-flex gap-2">
+            <a class="btn btn-light" href="{% url 'tracker:customer_edit' customer.id %}">
+              <i data-feather="edit-2" class="me-1"></i>Edit Customer
+            </a>
+            <a class="btn btn-warning" href="{% url 'tracker:create_order_for_customer' customer.id %}">
+              <i data-feather="plus-circle" class="me-1"></i>New Order
+            </a>
+          </div>
+          <div class="d-flex justify-content-end">
+            {% if customer.phone %}
+            <a href="tel:{{ customer.phone }}" class="btn btn-outline-light contact-button" title="Call">
+              <i data-feather="phone"></i>
+            </a>
+            {% endif %}
+            {% if customer.email %}
+            <a href="mailto:{{ customer.email }}" class="btn btn-outline-light contact-button" title="Email">
+              <i data-feather="mail"></i>
+            </a>
+            {% endif %}
+            <button class="btn btn-outline-light contact-button" onclick="navigator.share({title: 'Customer: {{ customer.full_name }}', text: '{{ customer.phone }}'})" title="Share">
+              <i data-feather="share-2"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Customer Information -->
+    <div class="col-lg-4">
+      <!-- Basic Details -->
+      <div class="info-card card mb-4">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i data-feather="user" class="me-2"></i>Customer Information
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="small text-muted">Customer Code</label>
+              <div class="fw-semibold">{{ customer.customer_code|default:customer.code }}</div>
+            </div>
+            <div class="col-6">
+              <label class="small text-muted">Phone Number</label>
+              <div class="fw-semibold">
+                <a href="tel:{{ customer.phone }}" class="text-decoration-none">{{ customer.phone }}</a>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="small text-muted">Email Address</label>
+              <div class="fw-semibold">
+                {% if customer.email %}
+                  <a href="mailto:{{ customer.email }}" class="text-decoration-none">{{ customer.email }}</a>
+                {% else %}
+                  <span class="text-muted">Not provided</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="small text-muted">Address</label>
+              <div class="fw-semibold">{{ customer.address|default:'Not provided' }}</div>
+            </div>
+            {% if customer.customer_type != 'personal' %}
+            <div class="col-6">
+              <label class="small text-muted">Organization</label>
+              <div class="fw-semibold">{{ customer.organization_name|default:'N/A' }}</div>
+            </div>
+            <div class="col-6">
+              <label class="small text-muted">Tax Number</label>
+              <div class="fw-semibold">{{ customer.tax_number|default:'N/A' }}</div>
+            </div>
+            {% endif %}
+            <div class="col-6">
+              <label class="small text-muted">Registration Date</label>
+              <div class="fw-semibold">{{ customer.created_at|date:"M d, Y" }}</div>
+            </div>
+            <div class="col-6">
+              <label class="small text-muted">Last Update</label>
+              <div class="fw-semibold">{{ customer.updated_at|date:"M d, Y" }}</div>
+            </div>
+          </div>
+          
+          {% if customer.notes %}
+          <hr>
+          <div>
+            <label class="small text-muted">Notes</label>
+            <div class="fw-semibold">{{ customer.notes|linebreaksbr }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Customer Statistics -->
+      <div class="info-card card mb-4">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i data-feather="bar-chart-2" class="me-2"></i>Customer Statistics
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <div class="stat-box">
+                <div class="h4 mb-1 text-primary">{{ customer.total_visits|default:0 }}</div>
+                <div class="small text-muted">Total Visits</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="stat-box">
+                <div class="h4 mb-1 text-success">{{ customer.total_spent|default:"0.00" }}</div>
+                <div class="small text-muted">Total Spent</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="stat-box">
+                <div class="h4 mb-1 text-info">{{ orders.count|default:0 }}</div>
+                <div class="small text-muted">Total Orders</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="stat-box">
+                <div class="h4 mb-1 text-warning">{{ completed_orders|default:0 }}</div>
+                <div class="small text-muted">Completed</div>
+              </div>
+            </div>
+          </div>
+          
+          <hr>
+          
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="small text-muted">First Visit</label>
+              <div class="fw-semibold">{{ customer.created_at|date:"M d, Y" }}</div>
+            </div>
+            <div class="col-6">
+              <label class="small text-muted">Last Visit</label>
+              <div class="fw-semibold">{{ customer.last_visit|date:"M d, Y"|default:'Never' }}</div>
+            </div>
+            {% if customer.arrival_time %}
+            <div class="col-12">
+              <label class="small text-muted">Current Visit</label>
+              <div class="fw-semibold text-success">
+                Arrived at {{ customer.arrival_time|date:"H:i" }}
+                <span class="badge bg-success ms-2">Here Now</span>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Customer Vehicles -->
+      {% if customer.vehicles.exists %}
+      <div class="info-card card">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i data-feather="truck" class="me-2"></i>Registered Vehicles
+          </h6>
+        </div>
+        <div class="card-body">
+          {% for vehicle in customer.vehicles.all %}
+          <div class="vehicle-card">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <h6 class="mb-1">{{ vehicle.plate_number }}</h6>
+                <div class="text-muted">{{ vehicle.make }} {{ vehicle.model }}</div>
+                <small class="text-muted">{{ vehicle.get_vehicle_type_display }}</small>
+              </div>
+              <span class="badge bg-light text-dark">{{ vehicle.year|default:'N/A' }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Orders and Activity -->
+    <div class="col-lg-8">
+      <!-- Recent Activity Summary -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="info-card card text-center">
+            <div class="card-body">
+              <i data-feather="clipboard" class="feather-24 text-primary mb-2"></i>
+              <h4 class="mb-1">{{ pending_orders|default:0 }}</h4>
+              <small class="text-muted">Pending Orders</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="info-card card text-center">
+            <div class="card-body">
+              <i data-feather="clock" class="feather-24 text-warning mb-2"></i>
+              <h4 class="mb-1">{{ active_orders|default:0 }}</h4>
+              <small class="text-muted">In Progress</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="info-card card text-center">
+            <div class="card-body">
+              <i data-feather="check-circle" class="feather-24 text-success mb-2"></i>
+              <h4 class="mb-1">{{ completed_orders|default:0 }}</h4>
+              <small class="text-muted">Completed</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="info-card card text-center">
+            <div class="card-body">
+              <i data-feather="calendar" class="feather-24 text-info mb-2"></i>
+              <h4 class="mb-1">{{ this_month_orders|default:0 }}</h4>
+              <small class="text-muted">This Month</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order History -->
+      <div class="info-card card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i data-feather="history" class="me-2"></i>Order History
+          </h5>
+          <div class="d-flex gap-2">
+            <a href="{% url 'tracker:orders_list' %}?customer={{ customer.id }}" class="btn btn-sm btn-outline-primary">
+              <i data-feather="external-link" class="me-1"></i>View All Orders
+            </a>
+            <a href="{% url 'tracker:create_order_for_customer' customer.id %}" class="btn btn-sm btn-primary">
+              <i data-feather="plus" class="me-1"></i>New Order
+            </a>
+          </div>
+        </div>
+
+        {% if orders %}
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Order Details</th>
+                  <th>Type & Status</th>
+                  <th>Vehicle</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th class="pe-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for o in orders %}
+                <tr class="order-card {{ o.type }}">
+                  <td class="ps-3">
+                    <div class="d-flex align-items-start">
+                      <div class="me-2">
+                        {% if o.type == 'service' %}
+                          <i data-feather="tool" class="feather-18 text-success"></i>
+                        {% elif o.type == 'sales' %}
+                          <i data-feather="shopping-cart" class="feather-18 text-warning"></i>
+                        {% else %}
+                          <i data-feather="message-circle" class="feather-18 text-info"></i>
+                        {% endif %}
+                      </div>
+                      <div>
+                        <div class="fw-semibold">
+                          <a href="{% url 'tracker:order_detail' o.id %}" class="text-decoration-none">
+                            {{ o.order_number }}
+                          </a>
+                        </div>
+                        {% if o.description %}
+                        <div class="small text-muted" title="{{ o.description }}">
+                          {{ o.description|truncatechars:40 }}
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge bg-light text-dark mb-1">{{ o.get_type_display }}</span>
+                    <br>
+                    <span class="badge 
+                      {% if o.status == 'completed' %}bg-success
+                      {% elif o.status == 'in_progress' %}bg-warning
+                      {% elif o.status == 'cancelled' %}bg-danger
+                      {% else %}bg-secondary{% endif %}">
+                      {{ o.get_status_display }}
+                    </span>
+                  </td>
+                  <td>
+                    {% if o.vehicle %}
+                      <strong>{{ o.vehicle.plate_number }}</strong>
+                      <br><small class="text-muted">{{ o.vehicle.make }} {{ o.vehicle.model }}</small>
+                    {% else %}
+                      <span class="text-muted">No vehicle</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <strong>{{ o.total_amount|default:"0.00" }}</strong>
+                    {% if o.priority == 'urgent' %}
+                      <br><span class="badge bg-danger">Urgent</span>
+                    {% elif o.priority == 'high' %}
+                      <br><span class="badge bg-warning">High</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="small">
+                      <strong>{{ o.created_at|date:"M d, Y" }}</strong>
+                      <br>{{ o.created_at|date:"H:i" }}
+                    </div>
+                    {% if o.completed_at %}
+                    <div class="small text-success">
+                      Completed: {{ o.completed_at|date:"M d" }}
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td class="pe-3">
+                    <div class="dropdown">
+                      <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                              type="button" data-bs-toggle="dropdown">
+                        <i data-feather="more-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                          <a class="dropdown-item" href="{% url 'tracker:order_detail' o.id %}">
+                            <i data-feather="eye" class="me-2 feather-14"></i>View Details
+                          </a>
+                        </li>
+                        {% if o.status != 'completed' and o.status != 'cancelled' %}
+                        <li>
+                          <a class="dropdown-item" href="{% url 'tracker:order_detail' o.id %}#status">
+                            <i data-feather="edit" class="me-2 feather-14"></i>Update Status
+                          </a>
+                        </li>
+                        {% endif %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                          <a class="dropdown-item" href="{% url 'tracker:order_detail' o.id %}#print">
+                            <i data-feather="printer" class="me-2 feather-14"></i>Print Receipt
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% else %}
+        <div class="card-body text-center py-5">
+          <i data-feather="clipboard" class="feather-48 text-muted mb-3"></i>
+          <h6 class="text-muted">No Orders Yet</h6>
+          <p class="text-muted mb-3">This customer hasn't placed any orders.</p>
+          <a href="{% url 'tracker:create_order_for_customer' customer.id %}" class="btn btn-primary">
+            <i data-feather="plus-circle" class="me-1"></i>Create First Order
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  'use strict';
+  
+  // Auto-refresh customer status if they're currently here
+  {% if customer.arrival_time %}
+  setInterval(() => {
+    // Optional: Refresh page to update status
+    // location.reload();
+  }, 300000); // Every 5 minutes
+  {% endif %}
+
+  // Enhanced sharing functionality
+  const shareBtn = document.querySelector('[onclick*="navigator.share"]');
+  if (shareBtn && !navigator.share) {
+    shareBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      // Fallback for browsers without native sharing
+      const text = `Customer: {{ customer.full_name }}\nPhone: {{ customer.phone }}{% if customer.email %}\nEmail: {{ customer.email }}{% endif %}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert('Customer info copied to clipboard!');
+        });
+      } else {
+        prompt('Customer info:', text);
+      }
+    });
+  }
+
+  // Phone number click tracking
+  const phoneLinks = document.querySelectorAll('a[href^="tel:"]');
+  phoneLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      console.log('Phone call initiated:', link.href);
+      // Optional: Track phone calls
+    });
+  });
+
+  // Initialize feather icons
+  if (window.feather) {
+    feather.replace();
+  }
+
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends 'tracker/base.html' %}
+{% block title %}Backup & Restore{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-1">Backup & Restore</h3>
+      <p class="text-muted mb-0">Export or reset system configuration</p>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="mb-2">Export</h5>
+          <p class="text-muted">Download a JSON file with current system settings.</p>
+          <a class="btn btn-primary" href="{% url 'tracker:backup_restore' %}?download=1">Download Settings</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="mb-2">Reset</h5>
+          <p class="text-muted">Reset system settings back to defaults.</p>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reset_settings">
+            <button class="btn btn-outline-danger" type="submit">Reset Settings</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

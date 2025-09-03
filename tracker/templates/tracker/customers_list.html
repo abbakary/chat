@@ -1,0 +1,475 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}Customers - Car Service Tracker{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/js-datatables/style.css' %}">
+<link rel="stylesheet" href="{% static 'css/datatables.css' %}">
+<style>
+  .page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+  }
+  .search-card {
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .customer-card {
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+  }
+  .customer-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+  }
+  .customer-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.1rem;
+  }
+  .customer-type-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .type-personal { background: #e3f2fd; color: #1976d2; }
+  .type-government { background: #e8f5e8; color: #388e3c; }
+  .type-ngo { background: #fff3e0; color: #f57c00; }
+  .type-company { background: #f3e5f5; color: #7b1fa2; }
+  
+  .stats-mini {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.5rem;
+    text-align: center;
+    margin: 0.25rem 0;
+  }
+  .table-responsive {
+    border-radius: 8px;
+  }
+  .action-menu .btn {
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .customer-status {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+  }
+  .status-active { background: #28a745; }
+  .status-inactive { background: #6c757d; }
+  .status-visited-today { background: #17a2b8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Page Header -->
+  <div class="page-header card">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h3 class="mb-2">Customer Management</h3>
+          <p class="mb-0 opacity-75">Manage all your customers and their information</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-light" href="{% url 'tracker:customers_export' %}?q={{ q }}">
+            <i data-feather="download" class="me-1"></i>Export CSV
+          </a>
+          <a class="btn btn-warning" href="{% url 'tracker:customer_register' %}">
+            <i data-feather="user-plus" class="me-1"></i>Register New Customer
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search and Filters -->
+  <div class="search-card card mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Search Customers</label>
+          <div class="input-group">
+            <span class="input-group-text">
+              <i data-feather="search"></i>
+            </span>
+            <input type="text" name="q" class="form-control" 
+                   placeholder="Search by name, phone, or code..." value="{{ q }}">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Customer Type</label>
+          <select name="type" class="form-select">
+            <option value="">All Types</option>
+            <option value="personal" {% if request.GET.type == 'personal' %}selected{% endif %}>Personal</option>
+            <option value="government" {% if request.GET.type == 'government' %}selected{% endif %}>Government</option>
+            <option value="ngo" {% if request.GET.type == 'ngo' %}selected{% endif %}>NGO</option>
+            <option value="company" {% if request.GET.type == 'company' %}selected{% endif %}>Company</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Status</label>
+          <select name="status" class="form-select">
+            <option value="">All Status</option>
+            <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>Inactive</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">&nbsp;</label>
+          <div class="d-grid">
+            <button class="btn btn-primary" type="submit">
+              <i data-feather="filter" class="me-1"></i>Filter
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Customer Statistics -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="users" class="feather-24 text-primary mb-2"></i>
+          <h4 class="mb-1">{{ customers.paginator.count|default:0 }}</h4>
+          <small class="text-muted">Total Customers</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="user-check" class="feather-24 text-success mb-2"></i>
+          <h4 class="mb-1">{{ active_customers|default:0 }}</h4>
+          <small class="text-muted">Active Today</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="user-plus" class="feather-24 text-info mb-2"></i>
+          <h4 class="mb-1">{{ new_customers_today|default:0 }}</h4>
+          <small class="text-muted">New Today</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center">
+        <div class="card-body">
+          <i data-feather="repeat" class="feather-24 text-warning mb-2"></i>
+          <h4 class="mb-1">{{ returning_customers|default:0 }}</h4>
+          <small class="text-muted">Returning</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customers Table -->
+  <div class="card">
+    <div class="card-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <i data-feather="list" class="me-2"></i>Customer List
+        </h5>
+        <div class="text-muted">
+          {% if customers %}
+            Showing {{ customers|length }} of {{ customers.paginator.count }} customers
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if customers %}
+      <div class="table-responsive">
+        <table id="customersTable" class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Customer</th>
+              <th>Contact Info</th>
+              <th>Type & Status</th>
+              <th>Activity</th>
+              <th>Statistics</th>
+              <th class="text-center pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in customers %}
+              <tr>
+                <td class="ps-3">
+                  <div class="d-flex align-items-center">
+                    <div class="customer-avatar me-3">
+                      {{ c.full_name|first|upper }}
+                    </div>
+                    <div>
+                      <div class="fw-semibold">
+                        <a href="{% url 'tracker:customer_detail' c.id %}" class="text-decoration-none">
+                          {{ c.full_name }}
+                        </a>
+                      </div>
+                      <small class="text-muted">{{ c.customer_code|default:c.code }}</small>
+                    </div>
+                  </div>
+                </td>
+                
+                <td>
+                  <div>
+                    <strong>{{ c.phone }}</strong>
+                    {% if c.email %}
+                      <br><small class="text-muted">{{ c.email }}</small>
+                    {% endif %}
+                  </div>
+                </td>
+                
+                <td>
+                  <span class="customer-type-badge type-{{ c.customer_type|default:'personal' }}">
+                    {{ c.customer_type|default:'Personal'|title }}
+                  </span>
+                  <div class="mt-1">
+                    <span class="customer-status {% if c.arrival_time %}status-visited-today{% elif c.total_visits > 0 %}status-active{% else %}status-inactive{% endif %}"></span>
+                    <small class="text-muted">
+                      {% if c.arrival_time %}Visited Today{% elif c.total_visits > 0 %}Active{% else %}New{% endif %}
+                    </small>
+                  </div>
+                </td>
+                
+                <td>
+                  <div class="small">
+                    <strong>Last Visit:</strong>
+                    <br>{{ c.last_visit|date:'M d, Y'|default:'Never' }}
+                  </div>
+                  {% if c.arrival_time %}
+                    <div class="small text-success">
+                      <strong>Arrived:</strong> {{ c.arrival_time|date:'H:i' }}
+                    </div>
+                  {% endif %}
+                </td>
+                
+                <td>
+                  <div class="row g-1">
+                    <div class="col-6">
+                      <div class="stats-mini">
+                        <strong>{{ c.total_visits|default:0 }}</strong>
+                        <div class="small text-muted">Visits</div>
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <div class="stats-mini">
+                        <strong>{{ c.total_spent|default:0 }}</strong>
+                        <div class="small text-muted">Spent</div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                
+                <td class="text-center pe-3">
+                  <div class="dropdown action-menu">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                            type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                      <i data-feather="more-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li>
+                        <a class="dropdown-item" href="{% url 'tracker:customer_detail' c.id %}">
+                          <i data-feather="eye" class="me-2 feather-14"></i>View Details
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'tracker:customer_edit' c.id %}">
+                          <i data-feather="edit-2" class="me-2 feather-14"></i>Edit Customer
+                        </a>
+                      </li>
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'tracker:create_order_for_customer' c.id %}">
+                          <i data-feather="plus-circle" class="me-2 feather-14"></i>New Order
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="{% url 'tracker:orders_list' %}?customer={{ c.id }}">
+                          <i data-feather="list" class="me-2 feather-14"></i>View Orders
+                        </a>
+                      </li>
+                      {% if c.phone %}
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <a class="dropdown-item" href="tel:{{ c.phone }}">
+                          <i data-feather="phone" class="me-2 feather-14"></i>Call Customer
+                        </a>
+                      </li>
+                      {% endif %}
+                      {% if c.email %}
+                      <li>
+                        <a class="dropdown-item" href="mailto:{{ c.email }}">
+                          <i data-feather="mail" class="me-2 feather-14"></i>Send Email
+                        </a>
+                      </li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="card-footer">
+        <nav aria-label="Customer pagination">
+          <ul class="pagination justify-content-center mb-0">
+            {% if customers.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?q={{ q }}&type={{ request.GET.type }}&status={{ request.GET.status }}&page=1">
+                  <i data-feather="chevrons-left" class="feather-14"></i>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?q={{ q }}&type={{ request.GET.type }}&status={{ request.GET.status }}&page={{ customers.previous_page_number }}">
+                  <i data-feather="chevron-left" class="feather-14"></i>
+                </a>
+              </li>
+            {% endif %}
+            
+            <li class="page-item active">
+              <span class="page-link">
+                Page {{ customers.number }} of {{ customers.paginator.num_pages }}
+              </span>
+            </li>
+            
+            {% if customers.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?q={{ q }}&type={{ request.GET.type }}&status={{ request.GET.status }}&page={{ customers.next_page_number }}">
+                  <i data-feather="chevron-right" class="feather-14"></i>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?q={{ q }}&type={{ request.GET.type }}&status={{ request.GET.status }}&page={{ customers.paginator.num_pages }}">
+                  <i data-feather="chevrons-right" class="feather-14"></i>
+                </a>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+
+    {% else %}
+      <div class="card-body text-center py-5">
+        <i data-feather="users" class="feather-48 text-muted mb-3"></i>
+        <h5 class="text-muted">No Customers Found</h5>
+        <p class="text-muted mb-4">
+          {% if q %}
+            No customers match your search criteria "{{ q }}".
+          {% else %}
+            You don't have any customers yet.
+          {% endif %}
+        </p>
+        <div class="d-flex gap-2 justify-content-center">
+          {% if q %}
+            <a href="{% url 'tracker:customers_list' %}" class="btn btn-outline-secondary">
+              <i data-feather="x" class="me-1"></i>Clear Search
+            </a>
+          {% endif %}
+          <a href="{% url 'tracker:customer_register' %}" class="btn btn-primary">
+            <i data-feather="user-plus" class="me-1"></i>Register First Customer
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/js-datatables/simple-datatables@latest.js' %}"></script>
+<script>
+(function(){
+  'use strict';
+  
+  // Initialize DataTable
+  const tableEl = document.querySelector('#customersTable');
+  if (tableEl && window.simpleDatatables && tableEl.querySelector('tbody tr')) {
+    try {
+      new simpleDatatables.DataTable(tableEl, {
+        searchable: true,
+        perPage: 25,
+        perPageSelect: [10, 25, 50, 100],
+        labels: {
+          placeholder: "Search customers...",
+          noRows: "No customers found",
+          info: "Showing {start} to {end} of {rows} customers"
+        },
+        layout: {
+          top: "{select}{search}",
+          bottom: "{info}{pager}"
+        }
+      });
+    } catch(e) {
+      console.warn('DataTable initialization error:', e);
+    }
+  }
+
+  // Phone number formatting
+  const phoneInputs = document.querySelectorAll('input[name="phone"]');
+  phoneInputs.forEach(input => {
+    input.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/\D/g, '');
+      if (value.startsWith('250')) {
+        value = '+' + value;
+      } else if (value.length === 9) {
+        value = '+250' + value;
+      }
+      e.target.value = value;
+    });
+  });
+
+  // Auto-refresh customer status (optional)
+  setInterval(() => {
+    // Update timestamps and status indicators
+    const timeElements = document.querySelectorAll('[data-timestamp]');
+    timeElements.forEach(el => {
+      const timestamp = el.dataset.timestamp;
+      if (timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) {
+          el.textContent = 'Just now';
+        } else if (diff < 3600000) {
+          el.textContent = Math.floor(diff / 60000) + ' min ago';
+        }
+      }
+    });
+  }, 30000); // Update every 30 seconds
+
+  // Initialize feather icons
+  if (window.feather) {
+    feather.replace();
+  }
+
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends 'tracker/base.html' %}
+{% block title %}Analytics{% endblock %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <h4 class="mb-0">Analytics Overview</h4>
+      <form method="get" class="d-flex align-items-center gap-2">
+        <select name="period" class="form-select form-select-sm">
+          <option value="daily" {% if period == 'daily' %}selected{% endif %}>Daily</option>
+          <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>Weekly</option>
+          <option value="monthly" {% if period == 'monthly' %}selected{% endif %}>Monthly</option>
+          <option value="yearly" {% if period == 'yearly' %}selected{% endif %}>Yearly</option>
+        </select>
+        <button class="btn btn-sm btn-outline-primary" type="submit">Apply</button>
+      </form>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:reports' %}">Go to Reports</a>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'tracker:reports_export' %}?from={{ export_from }}&to={{ export_to }}&type=all">Export CSV</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card h-100 stats-card active"><div class="card-body text-center">
+        <div class="text-muted">Total Orders</div><div class="display-6">{{ totals.total_orders }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 stats-card completed"><div class="card-body text-center">
+        <div class="text-muted">Completed</div><div class="display-6">{{ totals.completed }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 stats-card"><div class="card-body text-center">
+        <div class="text-muted">In Progress</div><div class="display-6">{{ totals.in_progress }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-3">
+      <div class="card h-100 stats-card customers"><div class="card-body text-center">
+        <div class="text-muted">New Customers</div><div class="display-6">{{ totals.customers }}</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-3"><div class="card h-100"><div class="card-header"><h6 class="mb-0">By Status</h6></div><div class="card-body"><div id="statusChart"></div></div></div></div>
+    <div class="col-lg-3"><div class="card h-100"><div class="card-header"><h6 class="mb-0">By Type</h6></div><div class="card-body"><div id="typeChart"></div></div></div></div>
+    <div class="col-lg-3"><div class="card h-100"><div class="card-header"><h6 class="mb-0">By Priority</h6></div><div class="card-body"><div id="priorityChart"></div></div></div></div>
+    <div class="col-lg-3"><div class="card h-100"><div class="card-header"><h6 class="mb-0">Trend</h6></div><div class="card-body"><div id="trendChart"></div></div></div></div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script id="chartsdata" type="application/json">{{ charts_json|safe }}</script>
+<script>
+  (function(){
+    const el = document.getElementById('chartsdata');
+    if (!el) return;
+    const data = JSON.parse(el.textContent || '{}');
+    const mkOpts = (labels, series, type='donut') => ({
+      chart: { type, height: 240, fontFamily: 'inherit' }, labels, series,
+      legend: { position: 'bottom' }, dataLabels: { enabled: false }, stroke: { width: 0 }
+    });
+    if (window.ApexCharts) {
+      if (data.status) new ApexCharts(document.querySelector('#statusChart'), mkOpts(data.status.labels, data.status.values)).render();
+      if (data.type) new ApexCharts(document.querySelector('#typeChart'), mkOpts(data.type.labels, data.type.values)).render();
+      if (data.priority) new ApexCharts(document.querySelector('#priorityChart'), mkOpts(data.priority.labels, data.priority.values)).render();
+      if (data.trend) new ApexCharts(document.querySelector('#trendChart'), {
+        chart: { type: 'area', height: 220, toolbar: {show:false}, fontFamily: 'inherit' },
+        series: [{ name: 'Orders', data: data.trend.values }],
+        xaxis: { categories: data.trend.labels, labels:{rotate:0} },
+        dataLabels: {enabled:false}, stroke:{curve:'smooth', width:2}, fill:{type:'gradient', gradient:{opacityFrom:0.4, opacityTo:0.1}}
+      }).render();
+    }
+  })();
+</script>
+{% endblock %}

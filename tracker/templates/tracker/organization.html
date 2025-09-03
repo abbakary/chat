@@ -1,0 +1,84 @@
+{% extends 'tracker/base.html' %}
+
+{%load static%}
+{% block title %}Organizations{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/js-datatables/style.css' %}">
+<link rel="stylesheet" href="{% static 'css/datatables.css' %}">
+{% endblock %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Organizations</h4>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">Total</div><div class="display-6">{{ total_org }}</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">Government</div><div class="display-6">{{ counts.government|default:0 }}</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">NGO</div><div class="display-6">{{ counts.ngo|default:0 }}</div></div></div></div>
+    <div class="col-md-3"><div class="card text-center"><div class="card-body"><div class="text-muted">Company</div><div class="display-6">{{ counts.company|default:0 }}</div></div></div></div>
+  </div>
+
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-sm-6 col-md-4">
+      <input type="text" name="q" class="form-control" placeholder="Search organizations..." value="{{ q }}">
+    </div>
+    <div class="col-auto"><button class="btn btn-outline-primary" type="submit">Search</button></div>
+  </form>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table id="orgTable" class="table mb-0">
+        <thead class="table-light"><tr><th>Code</th><th>Name</th><th>Contact</th><th>Tax No</th><th>Type</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          {% for c in customers %}
+            <tr>
+              <td>{{ c.code }}</td>
+              <td><a href="{% url 'tracker:customer_detail' c.id %}">{{ c.full_name }}</a></td>
+              <td>{{ c.phone }}</td>
+              <td>{{ c.tax_number }}</td>
+              <td class="text-capitalize">{{ c.customer_type }}</td>
+              <td class="text-end">
+                <div class="dropdown action-menu">
+                  <button class="btn btn-outline-secondary btn-icon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i data-feather="more-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'tracker:customer_detail' c.id %}"><i data-feather="eye" class="me-2"></i>View</a></li>
+                    <li><a class="dropdown-item" href="{% url 'tracker:customer_edit' c.id %}"><i data-feather="edit-2" class="me-2"></i>Edit</a></li>
+                    <li><a class="dropdown-item" href="{% url 'tracker:create_order_for_customer' c.id %}"><i data-feather="plus-circle" class="me-2"></i>New Order</a></li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-center p-3">No organizations</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer">
+      <nav>
+        <ul class="pagination mb-0">
+          {% if customers.has_previous %}
+            <li class="page-item"><a class="page-link" href="?q={{ q }}&page={{ customers.previous_page_number }}">Prev</a></li>
+          {% endif %}
+          <li class="page-item disabled"><span class="page-link">Page {{ customers.number }} of {{ customers.paginator.num_pages }}</span></li>
+          {% if customers.has_next %}
+            <li class="page-item"><a class="page-link" href="?q={{ q }}&page={{ customers.next_page_number }}">Next</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/js-datatables/simple-datatables@latest.js' %}"></script>
+<script>
+  (function(){
+    const el = document.querySelector('#orgTable');
+    if (el && window.simpleDatatables) {
+      new simpleDatatables.DataTable(el, { searchable: true, perPage: 10, perPageSelect: [10,25,50,100] });
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends 'tracker/base.html' %}
+{%load static%}
+{% block title %}Reports{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/flatpickr/flatpickr.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/vendors/js-datatables/style.css' %}">
+<link rel="stylesheet" href="{% static 'css/datatables.css' %}">
+{% endblock %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Reports</h4>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'tracker:reports_export' %}?from={{ filters.from }}&to={{ filters.to }}&type={{ filters.type }}">Export CSV</a>
+  </div>
+
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-sm-3"><input id="fromDate" type="text" name="from" value="{{ filters.from }}" class="form-control" placeholder="From date"></div>
+    <div class="col-sm-3"><input id="toDate" type="text" name="to" value="{{ filters.to }}" class="form-control" placeholder="To date"></div>
+    <div class="col-sm-3">
+      <select name="type" class="form-select">
+        <option value="all" {% if filters.type == 'all' %}selected{% endif %}>All</option>
+        <option value="service" {% if filters.type == 'service' %}selected{% endif %}>Service</option>
+        <option value="sales" {% if filters.type == 'sales' %}selected{% endif %}>Sales</option>
+        <option value="consultation" {% if filters.type == 'consultation' %}selected{% endif %}>Consultation</option>
+      </select>
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <button class="btn btn-outline-primary" type="submit">Apply</button>
+      <div class="btn-group">
+        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Quick Range</button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="#" data-range="daily">Today</a></li>
+          <li><a class="dropdown-item" href="#" data-range="weekly">Last 7 days</a></li>
+          <li><a class="dropdown-item" href="#" data-range="monthly">Last 30 days</a></li>
+          <li><a class="dropdown-item" href="#" data-range="yearly">This Year</a></li>
+        </ul>
+      </div>
+      <a class="btn btn-outline-success" id="exportBtn" href="{% url 'tracker:reports_export' %}?from={{ filters.from }}&to={{ filters.to }}&type={{ filters.type }}">Export CSV</a>
+    </div>
+  </form>
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card text-center"><div class="card-body">
+        <div class="text-muted">Total</div><div class="display-6">{{ stats.total }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center"><div class="card-body">
+        <div class="text-muted">Completed</div><div class="display-6">{{ stats.completed }}</div>
+      </div></div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-center"><div class="card-body">
+        <div class="text-muted">In Progress</div><div class="display-6">{{ stats.in_progress }}</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="table-responsive">
+      <table id="reportsTable" class="table mb-0">
+        <thead class="table-light"><tr><th>Order</th><th>Customer</th><th>Type</th><th>Status</th><th>Created</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          {% for o in orders %}
+            <tr>
+              <td>{{ o.order_number }}</td>
+              <td>{{ o.customer.full_name }}</td>
+              <td class="text-capitalize">{{ o.get_type_display }}</td>
+              <td class="text-capitalize">{{ o.get_status_display }}</td>
+              <td>{{ o.created_at|date:'Y-m-d H:i' }}</td>
+              <td class="text-end">
+                <div class="dropdown action-menu">
+                  <button class="btn btn-outline-secondary btn-icon dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i data-feather="more-vertical"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'tracker:order_detail' o.id %}"><i data-feather="eye" class="me-2"></i>View Order</a></li>
+                    <li><a class="dropdown-item" href="{% url 'tracker:customer_detail' o.customer.id %}"><i data-feather="user" class="me-2"></i>View Customer</a></li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="text-center p-3">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/js-datatables/simple-datatables@latest.js' %}"></script>
+<script src="{% static 'js/flat-pickr/flatpickr.js' %}"></script>
+<script>
+  (function(){
+    if (window.flatpickr) {
+      flatpickr('#fromDate', { dateFormat: 'Y-m-d' });
+      flatpickr('#toDate', { dateFormat: 'Y-m-d' });
+    }
+    const el = document.querySelector('#reportsTable');
+    if (el && window.simpleDatatables) {
+      new simpleDatatables.DataTable(el, { searchable: true, perPage: 10, perPageSelect: [10,25,50,100] });
+    }
+    // Quick range presets
+    const pad = n => n.toString().padStart(2,'0');
+    const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    document.querySelectorAll('[data-range]')?.forEach(a => a.addEventListener('click', e => {
+      e.preventDefault();
+      const r = a.dataset.range;
+      const now = new Date();
+      let from = new Date(now), to = new Date(now);
+      if (r === 'weekly') from.setDate(now.getDate() - 6);
+      else if (r === 'monthly') from.setDate(now.getDate() - 29);
+      else if (r === 'yearly') { from = new Date(now.getFullYear(), 0, 1); }
+      document.getElementById('fromDate').value = fmt(from);
+      document.getElementById('toDate').value = fmt(to);
+      const exportBtn = document.getElementById('exportBtn');
+      const type = document.querySelector('select[name="type"]').value;
+      exportBtn.href = `{% url 'tracker:reports_export' %}?from=${fmt(from)}&to=${fmt(to)}&type=${encodeURIComponent(type)}`;
+    }));
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}System Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-1">System Settings</h3>
+      <p class="text-muted mb-0">Configure global options for POS Tracker</p>
+    </div>
+  </div>
+
+  <form method="post" class="card shadow-sm">
+    <div class="card-body">
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Company/Workshop Name</label>
+          {{ form.company_name }}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Default Order Priority</label>
+          {{ form.default_priority }}
+        </div>
+        <div class="col-md-6">
+          <div class="form-check mt-4">
+            {{ form.enable_unbranded_alias }}
+            <label class="form-check-label">Enable "Unbranded" alias for empty brand</label>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-check mt-4">
+            {{ form.allow_order_without_vehicle }}
+            <label class="form-check-label">Allow orders without selecting a vehicle</label>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">SMS Provider</label>
+          {{ form.sms_provider }}
+          <div class="form-text">Configure credentials in environment variables.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2">
+      <a href="{% url 'tracker:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">Save Settings</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
