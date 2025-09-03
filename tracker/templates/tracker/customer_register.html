@@ -369,11 +369,7 @@
                       <div class="col-md-6">
                         <div class="mb-3">
                           <label class="form-label fw-semibold">Brand</label>
-                          <div class="input-group">
-                            {{ order_form.brand }}
-                            <span class="input-group-text" id="stockCount">0 available</span>
-                          </div>
-                          <div id="crBrandHint" class="form-text">Select item to load brands</div>
+                          {{ order_form.brand }}
                         </div>
                       </div>
                       <div class="col-md-6">
@@ -388,13 +384,6 @@
                           {{ order_form.tire_type }}
                         </div>
                       </div>
-                    </div>
-                    <div id="crStockInfo" class="alert alert-light border d-flex justify-content-between align-items-center" style="display:none">
-                      <div>
-                        <small class="fw-semibold">Stock Status:</small>
-                        <span id="crStockText">In Stock</span>
-                      </div>
-                      <div id="crStockBadge" class="badge bg-success">30 units available</div>
                     </div>
                   </div>
                 </div>
@@ -501,37 +490,6 @@
   setReq('[name="quantity"]', intentType==='sales');
   setReq('[name="inquiry_type"]', intentType==='consultation');
   setReq('[name="questions"]', intentType==='consultation');
-
-  let crItem, crBrand, crQty, crStockInfo, crStockText, crStockBadge, crBrandHint, stockCount;
-  function initFormElements(){
-    crItem=document.querySelector('[name="item_name"]');
-    crBrand=document.querySelector('[name="brand"]');
-    crQty=document.querySelector('[name="quantity"]');
-    crStockInfo=document.getElementById('crStockInfo');
-    crStockText=document.getElementById('crStockText');
-    crStockBadge=document.getElementById('crStockBadge');
-    crBrandHint=document.getElementById('crBrandHint');
-    stockCount=document.getElementById('stockCount');
-    if ($ && $.fn.select2){ if(crItem) $(crItem).select2({placeholder:'Select item',width:'100%',allowClear:true}); if(crBrand) $(crBrand).select2({placeholder:'Select brand',width:'100%',allowClear:true}); }
-  }
-  function setupEventListeners(){ if(crItem){ crItem.addEventListener('change',()=>{ loadBrandsCR(); }); } if(crBrand){ crBrand.addEventListener('change',()=>{ checkStockCR(); }); } if(crQty){ crQty.addEventListener('input', debounce(()=>{ checkStockCR(); }, 300)); } }
-  async function fetchJSON(url){ try{ const r=await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest','Cache-Control':'no-cache','Pragma':'no-cache'}}); return await r.json(); }catch(e){ return {}; } }
-  async function loadBrandsCR(){ if(!crItem||!crBrand||!crBrandHint) return; const name=crItem.value; const clearOptions=()=>{ if($ && $.fn.select2){ $(crBrand).empty().append('<option value="">Select brand</option>').trigger('change'); } else { crBrand.innerHTML='<option value="">Select brand</option>'; } };
-    const buildOptions=(brands)=>{ clearOptions(); let total=0; if(!brands||!brands.length){ if(crBrandHint) crBrandHint.textContent='No brands available for this item'; if(stockCount) stockCount.textContent='0 available'; if(crStockInfo) crStockInfo.style.display='none'; return; } brands.forEach(b=>{ const brandName=(b.brand&&b.brand.trim())||'Unbranded'; const qty=typeof b.quantity==='number'?b.quantity:0; const price=b.price||''; total+=qty; const label=price?`${brandName} (${qty} available - ${price})`:`${brandName} (${qty} available)`; const opt=new Option(label, brandName); opt.dataset.quantity=qty; opt.dataset.price=price; crBrand.add(opt); }); if(stockCount) stockCount.textContent= total>0?`${total} available`:'Out of stock'; if(crBrandHint) crBrandHint.textContent = `${brands.length} brand${brands.length!==1?'s':''} available`; if(brands.length===1){ if($ && $.fn.select2){ $(crBrand).val((brands[0].brand||'Unbranded')).trigger('change'); } else { crBrand.value=(brands[0].brand||'Unbranded'); } checkStockCR(); } };
-    if(!name){ clearOptions(); if(crBrandHint) crBrandHint.textContent='Select an item to see available brands'; if(stockCount) stockCount.textContent='0 available'; if(crStockInfo) crStockInfo.style.display='none'; return; }
-    if(crBrandHint) crBrandHint.innerHTML='<span class="spinner-border spinner-border-sm"></span> Loading brands...';
-    try{ const url = `{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}&_=${Date.now()}`; const data = await fetchJSON(url); if(data && Array.isArray(data.brands)){ buildOptions(data.brands); } else { buildOptions([]); if(crBrandHint) crBrandHint.textContent='No brands found for this item'; } if($){ $(crBrand).trigger('change'); } checkStockCR(); } catch(err){ buildOptions([]); if(crBrandHint) crBrandHint.textContent='Error loading brands. Please try again.'; }
-  }
-  async function checkStockCR(){ if(!crItem||!crBrand||!crStockInfo||!crStockText||!crStockBadge) return; const name=crItem.value; const brand=crBrand.value; const qty=crQty? (parseInt(crQty.value)||0):0; if(!name||!brand){ crStockInfo.style.display='none'; return; }
-    try{ const params = new URLSearchParams({ name, brand, _: String(Date.now()) }); const stockUrl = '{% url "tracker:api_inventory_stock" %}'; const data = await fetchJSON(`${stockUrl}?${params.toString()}`); const available = data.available||0; if(stockCount) stockCount.textContent = available>0?`${available} available`:'Out of stock'; if(crQty){ crQty.max=available; if(qty>available){ crQty.value = available>0? available: ''; } }
-      crStockText.textContent = available>0? 'In Stock': 'Out of Stock'; let cls='badge '; let text=''; if(available===0){ cls+='bg-danger'; text='Out of Stock'; } else if(available<qty){ cls+='bg-warning text-dark'; text='Insufficient Stock'; } else if(available<5){ cls+='bg-warning text-dark'; text='Low Stock'; } else { cls+='bg-success'; text='In Stock'; } crStockBadge.className=cls; crStockBadge.textContent=text; crStockInfo.style.display='flex'; }catch(e){ crStockText.textContent='Error checking stock'; crStockBadge.className='badge bg-secondary'; crStockBadge.textContent='Unknown'; crStockInfo.style.display='flex'; }
-  }
-
-  const isStep4 = String('{{ step }}') === '4' || window.location.search.includes('step=4');
-  if (isStep4 && '{{ intent }}' === 'sales') { setTimeout(()=>{ initFormElements(); setupEventListeners(); loadBrandsCR(); checkStockCR(); const typeInput=document.getElementById('id_type'); if(typeInput){ typeInput.value='sales'; } }, 300); } else { initFormElements(); setupEventListeners(); }
-
-  const f=document.querySelector('form[method="post"]');
-  if(f){ f.addEventListener('submit', function(){ if('{{ intent }}'==='sales'){ const typeInput=document.getElementById('id_type'); if(typeInput){ typeInput.value='sales'; } } }); }
 
   if (window.feather) { feather.replace(); }
 })();
