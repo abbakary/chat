@@ -488,7 +488,9 @@
       if (subtype) subtype.required = requireSubtype;
     }
   }
-  customerTypeSelect?.addEventListener('change', updateCustomerTypeFields); updateCustomerTypeFields();
+  customerTypeSelect?.addEventListener('change', updateCustomerTypeFields);
+  if ($ && $.fn.select2 && customerTypeSelect){ $(customerTypeSelect).on('change.select2', updateCustomerTypeFields); }
+  updateCustomerTypeFields();
 
   const intentType = '{% if intent == "service" %}service{% elif intent == "sales" %}sales{% elif intent == "inquiry" %}consultation{% else %}{% endif %}';
   function setReq(sel, req){ const el=document.querySelector(sel); if(el) el.required=!!req; }
