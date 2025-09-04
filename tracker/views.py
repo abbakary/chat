@@ -1485,6 +1485,7 @@ def backup_restore(request: HttpRequest):
         payload = {
             'system_settings': cache.get('system_settings', {}),
         }
+        add_audit_log(request.user, 'backup_download', 'Downloaded system settings backup')
         resp = HttpResponse(json.dumps(payload, indent=2), content_type='application/json')
         resp['Content-Disposition'] = 'attachment; filename="backup.json"'
         return resp
@@ -1492,6 +1493,21 @@ def backup_restore(request: HttpRequest):
         action = request.POST.get('action')
         if action == 'reset_settings':
             cache.delete('system_settings')
+            add_audit_log(request.user, 'settings_reset', 'Reset system settings to defaults')
             messages.success(request, 'System settings have been reset to defaults')
+            return redirect('tracker:backup_restore')
+        if action == 'restore_settings' and request.FILES.get('file'):
+            f = request.FILES['file']
+            try:
+                data = json.load(f)
+                settings_data = data.get('system_settings') or {}
+                if isinstance(settings_data, dict):
+                    cache.set('system_settings', settings_data, None)
+                    add_audit_log(request.user, 'settings_restored', 'Restored system settings from uploaded backup')
+                    messages.success(request, 'Settings restored from backup')
+                else:
+                    messages.error(request, 'Invalid backup file format')
+            except Exception as e:
+                messages.error(request, f'Failed to restore: {e}')
             return redirect('tracker:backup_restore')
     return render(request, 'tracker/backup_restore.html')
