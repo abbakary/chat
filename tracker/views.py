@@ -486,7 +486,8 @@ def order_start(request: HttpRequest):
         remaining = None
         if order.type == 'sales':
             from .utils import adjust_inventory
-            ok, status, rem = adjust_inventory(order.item_name, order.brand, -(order.quantity or 0))
+            qty_int = int(order.quantity or 0)
+            ok, status, rem = adjust_inventory(order.item_name, order.brand, -qty_int)
             remaining = rem if ok else None
         return JsonResponse({'success': True, 'message': 'Order created successfully', 'order_id': order.id, 'remaining': remaining})
 
