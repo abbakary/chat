@@ -1121,6 +1121,11 @@ def customers_quick_create(request: HttpRequest):
                 customer_type=customer_type
             )
 
+            try:
+                add_audit_log(request.user, 'customer_create', f"Created customer {customer.full_name} ({customer.code})")
+            except Exception:
+                pass
+
             return JsonResponse({
                 'success': True,
                 'message': 'Customer created successfully',
