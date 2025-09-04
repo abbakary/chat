@@ -499,8 +499,19 @@
     const qtyInput = form.querySelector('[name="quantity"]');
     const stockHint = document.getElementById('regStockHint');
     async function apiGet(url){ try{ const r=await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } catch(e){ return {}; } }
-    function setOptions(select, items, placeholder){ const current = select.value; const opts = [`<option value=\"\">${placeholder}</option>`].concat(items.map(i=>`<option value=\"${i.value}\">${i.label}</option>`)); select.innerHTML = opts.join(''); if (items.some(i=>i.value===current)) { select.value = current; } else { select.value = ''; } if (window.jQuery && jQuery.fn.select2) { jQuery(select).trigger('change.select2'); } }
-    async function loadBrands(){ const name=(selItem?.value||'').trim(); if(!selBrand) return; if(!name){ setOptions(selBrand, [], 'Select brand'); updateStock(); return; } const data = await apiGet(`{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}`); const brands = (data.brands||[]).map(b=>({ value: b.brand, label: b.brand+(b.quantity? ` (qty: ${b.quantity})`: '') })); setOptions(selBrand, brands, 'Select brand'); updateStock(); }
+    function setOptions(select, items, placeholder){
+      const current = (window.jQuery && jQuery.fn.select2) ? jQuery(select).val() : select.value;
+      if (window.jQuery && jQuery.fn.select2){
+        jQuery(select).empty().append(new Option(placeholder, '', true, false));
+        items.forEach(i=>{ jQuery(select).append(new Option(i.label, i.value, false, false)); });
+        jQuery(select).trigger('change.select2');
+      } else {
+        const opts = [`<option value=\"\">${placeholder}</option>`].concat(items.map(i=>`<option value=\"${i.value}\">${i.label}</option>`));
+        select.innerHTML = opts.join('');
+      }
+      if (items.some(i=>i.value===current)) { if (window.jQuery && jQuery.fn.select2) { jQuery(select).val(current).trigger('change.select2'); } else { select.value = current; } } else { if (window.jQuery && jQuery.fn.select2) { jQuery(select).val('').trigger('change.select2'); } else { select.value = ''; } }
+    }
+    async function loadBrands(){ const name=(selItem?.value||'').trim(); if(!selBrand) return; if(!name){ setOptions(selBrand, [], 'Select brand'); updateStock(); return; } const data = await apiGet(`{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}`); const brands = (data.brands||[]).map(b=>({ value: (b.brand && b.brand.trim()) || 'Unbranded', label: ((b.brand && b.brand.trim()) || 'Unbranded') + (b.quantity? ` (qty: ${b.quantity})`: '') })); setOptions(selBrand, brands, 'Select brand'); updateStock(); }
     async function updateStock(){ if(!selItem||!selBrand||!qtyInput||!stockHint) return; const name=(selItem.value||'').trim(); const brand=(selBrand.value||'').trim(); if(!name||!brand){ stockHint.textContent=''; qtyInput.removeAttribute('max'); return; } const data = await apiGet(`{% url 'tracker:api_inventory_stock' %}?name=${encodeURIComponent(name)}&brand=${encodeURIComponent(brand)}`); const available = parseInt(data.available||0,10); if(available>=0){ stockHint.textContent = `Available: ${available}`; qtyInput.max = available>0? available: null; if(available>0 && (!qtyInput.value || parseInt(qtyInput.value,10)<=0)){ qtyInput.value = 1; } } }
     selItem?.addEventListener('change', loadBrands);
     selBrand?.addEventListener('change', updateStock);
