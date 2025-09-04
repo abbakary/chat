@@ -1049,7 +1049,8 @@ def user_edit(request: HttpRequest, pk: int):
     if request.method == 'POST':
         form = AdminUserForm(request.POST, instance=u)
         if form.is_valid():
-            form.save()
+            updated_user = form.save()
+            add_audit_log(request.user, 'user_update', f'Updated user {updated_user.username}')
             messages.success(request, 'User updated')
             return redirect('tracker:users_list')
         else:
