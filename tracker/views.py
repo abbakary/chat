@@ -1083,6 +1083,10 @@ def customer_edit(request: HttpRequest, pk: int):
         form = CustomerEditForm(request.POST, instance=customer)
         if form.is_valid():
             form.save()
+            try:
+                add_audit_log(request.user, 'customer_update', f"Updated customer {customer.full_name} ({customer.code})")
+            except Exception:
+                pass
             messages.success(request, 'Customer updated successfully')
             return redirect('tracker:customer_detail', pk=customer.id)
         else:
