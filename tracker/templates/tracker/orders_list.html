@@ -127,7 +127,10 @@
       <div class="orders-header d-flex flex-column flex-sm-row align-items-start justify-content-between gap-2">
         <h3 class="orders-header-title mb-0">Orders</h3>
         <div class="orders-header-actions header-actions d-flex gap-2 flex-wrap w-100 justify-content-start justify-content-sm-end ms-sm-auto">
-          <a class="btn btn-light flex-shrink-0" href="{% url 'tracker:orders_export' %}?status={{ request.GET.status|default:'all' }}&type={{ request.GET.type|default:'all' }}">
+          <a class="btn btn-outline-secondary flex-shrink-0" href="#" onclick="window.print(); return false;">
+            <i data-feather="printer" class="me-1"></i><span>Print List</span>
+          </a>
+          <a class="btn btn-light flex-shrink-0" href="{% url 'tracker:orders_export' %}?{{ request.GET.urlencode }}">
             <i data-feather="download" class="me-1"></i><span>Export CSV</span>
           </a>
           <a class="btn btn-warning flex-shrink-0" href="{% url 'tracker:order_start' %}">
@@ -446,14 +449,6 @@
               with {{ request.GET.status }} status
             {% endif %}
           </small>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
-              <i data-feather="printer" class="me-1"></i>Print List
-            </button>
-            <a href="{% url 'tracker:orders_export' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-outline-primary">
-              <i data-feather="download" class="me-1"></i>Export Data
-            </a>
-          </div>
         </div>
       </div>
 
