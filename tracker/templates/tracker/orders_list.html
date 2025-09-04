@@ -109,7 +109,8 @@
     font-size: 0.8rem;
     color: #6c757d;
   }
-  .page-header .header-actions{flex-wrap:wrap; max-width:100%}
+  .page-header .card-body{overflow:visible}
+  .page-header .header-actions{flex-wrap:wrap; max-width:100%; overflow:visible}
   .page-header .header-actions .btn{white-space:nowrap}
   @media (max-width: 576px){ .page-header .header-actions .btn{width:100%} }
 </style>
@@ -120,13 +121,13 @@
   <!-- Page Header -->
   <div class="page-header card">
     <div class="card-body">
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-2">
-        <div><h3 class="mb-0">Orders</h3></div>
-        <div class="header-actions d-flex gap-2 flex-wrap w-100 w-md-auto justify-content-start justify-content-md-end ms-md-auto">
-          <a class="btn btn-light" href="{% url 'tracker:orders_export' %}?status={{ request.GET.status|default:'all' }}&type={{ request.GET.type|default:'all' }}">
+      <div class="d-flex flex-column flex-sm-row align-items-start justify-content-between gap-2">
+        <h3 class="mb-0">Orders</h3>
+        <div class="header-actions d-flex gap-2 flex-wrap w-100 justify-content-start justify-content-sm-end ms-sm-auto">
+          <a class="btn btn-light flex-shrink-0" href="{% url 'tracker:orders_export' %}?status={{ request.GET.status|default:'all' }}&type={{ request.GET.type|default:'all' }}">
             <i data-feather="download" class="me-1"></i><span>Export CSV</span>
           </a>
-          <a class="btn btn-warning" href="{% url 'tracker:order_start' %}">
+          <a class="btn btn-warning flex-shrink-0" href="{% url 'tracker:order_start' %}">
             <i data-feather="plus-circle" class="me-1"></i><span>New Order</span>
           </a>
         </div>
