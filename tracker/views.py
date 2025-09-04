@@ -1322,7 +1322,7 @@ def update_inquiry_status(request: HttpRequest, pk: int):
 @login_required
 def reports_advanced(request: HttpRequest):
     """Advanced reports with period and type filters"""
-    from datetime import timedelta
+    from datetime import timedelta, datetime, time as dt_time
 
     period = request.GET.get('period', 'monthly')
     report_type = request.GET.get('type', 'overview')
@@ -1350,23 +1350,25 @@ def reports_advanced(request: HttpRequest):
         date_format = '%d'
         labels = [(start_date + timedelta(days=i)).strftime('%d') for i in range(30)]
 
+    # Compute timezone-aware datetime range [start_dt, end_dt)
+    tz = timezone.get_current_timezone()
+    start_dt = timezone.make_aware(datetime.combine(start_date, dt_time.min), tz)
+    end_dt = timezone.make_aware(datetime.combine(end_date + timedelta(days=1), dt_time.min), tz)
+
+    # Reuse filtered querysets for consistency
+    qs = Order.objects.filter(created_at__gte=start_dt, created_at__lt=end_dt)
+    cqs = Customer.objects.filter(registration_date__gte=start_dt, registration_date__lt=end_dt)
+
     # Base statistics
-    total_orders = Order.objects.filter(created_at__date__range=[start_date, end_date]).count()
-    completed_orders = Order.objects.filter(
-        created_at__date__range=[start_date, end_date],
-        status='completed'
-    ).count()
-    pending_orders = Order.objects.filter(
-        created_at__date__range=[start_date, end_date],
-        status__in=['created', 'assigned', 'in_progress']
-    ).count()
-    total_customers = Customer.objects.filter(registration_date__date__range=[start_date, end_date]).count()
+    total_orders = qs.count()
+    completed_orders = qs.filter(status='completed').count()
+    pending_orders = qs.filter(status__in=['created', 'assigned', 'in_progress']).count()
+    total_customers = cqs.count()
 
     completion_rate = int((completed_orders * 100) / total_orders) if total_orders > 0 else 0
 
     # Average duration
-    avg_duration_qs = Order.objects.filter(
-        created_at__date__range=[start_date, end_date],
+    avg_duration_qs = qs.filter(
         actual_duration__isnull=False
     ).aggregate(avg_duration=Avg('actual_duration'))
     avg_duration = int(avg_duration_qs['avg_duration'] or 0)
@@ -1381,15 +1383,9 @@ def reports_advanced(request: HttpRequest):
         'new_customers': total_customers,
         'avg_service_time': avg_duration,
         # Order type breakdown
-        'service_orders': Order.objects.filter(
-            created_at__date__range=[start_date, end_date], type='service'
-        ).count(),
-        'sales_orders': Order.objects.filter(
-            created_at__date__range=[start_date, end_date], type='sales'
-        ).count(),
-        'consultation_orders': Order.objects.filter(
-            created_at__date__range=[start_date, end_date], type='consultation'
-        ).count(),
+        'service_orders': qs.filter(type='service').count(),
+        'sales_orders': qs.filter(type='sales').count(),
+        'consultation_orders': qs.filter(type='consultation').count(),
     }
 
     # Calculate percentages
@@ -1401,7 +1397,7 @@ def reports_advanced(request: HttpRequest):
         stats['service_percentage'] = stats['sales_percentage'] = stats['consultation_percentage'] = 0
 
     # Real trend data per selected period
-    qs = Order.objects.filter(created_at__date__range=[start_date, end_date])
+    qs = Order.objects.filter(created_at__gte=start_dt, created_at__lt=end_dt)
     if period == 'daily':
         from django.db.models.functions import ExtractHour
         trend_map = {int(r['h'] or 0): r['c'] for r in qs.annotate(h=ExtractHour('created_at')).values('h').annotate(c=Count('id'))}
@@ -1436,29 +1432,22 @@ def reports_advanced(request: HttpRequest):
         'types': {
             'labels': ['Personal', 'Company', 'Government', 'NGO', 'Bodaboda'],
             'values': [
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='personal').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='company').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='government').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='ngo').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='bodaboda').count(),
+                cqs.filter(customer_type='personal').count(),
+                cqs.filter(customer_type='company').count(),
+                cqs.filter(customer_type='government').count(),
+                cqs.filter(customer_type='ngo').count(),
+                cqs.filter(customer_type='bodaboda').count(),
             ]
         }
     }
 
     # Get data items based on report type
     if report_type == 'customers':
-        data_items = Customer.objects.filter(
-            registration_date__date__range=[start_date, end_date]
-        ).order_by('-registration_date')[:20]
+        data_items = cqs.order_by('-registration_date')[:20]
     elif report_type == 'inquiries':
-        data_items = Order.objects.filter(
-            created_at__date__range=[start_date, end_date],
-            type='consultation'
-        ).select_related('customer').order_by('-created_at')[:20]
+        data_items = qs.filter(type='consultation').select_related('customer').order_by('-created_at')[:20]
     else:
-        data_items = Order.objects.filter(
-            created_at__date__range=[start_date, end_date]
-        ).select_related('customer').order_by('-created_at')[:20]
+        data_items = qs.select_related('customer').order_by('-created_at')[:20]
 
     context = {
         'period': period,
