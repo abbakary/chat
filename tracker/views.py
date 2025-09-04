@@ -985,6 +985,10 @@ def inventory_edit(request: HttpRequest, pk: int):
             item = form.save()
             from .utils import clear_inventory_cache
             clear_inventory_cache(item.name, item.brand)
+            try:
+                add_audit_log(request.user, 'inventory_update', f"Item '{item.name}' ({item.brand or 'Unbranded'}) now qty={item.quantity}")
+            except Exception:
+                pass
             messages.success(request, 'Inventory item updated')
             return redirect('tracker:inventory_list')
         else:
