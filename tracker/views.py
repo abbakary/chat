@@ -633,6 +633,10 @@ def update_order_status(request: HttpRequest, pk: int):
                 from .utils import adjust_inventory
                 adjust_inventory(o.item_name, o.brand, (o.quantity or 0))
         o.save()
+        try:
+            add_audit_log(request.user, 'order_status_update', f"Order {o.order_number}: {o.status}")
+        except Exception:
+            pass
         messages.success(request, f"Order status updated to {status.replace('_',' ').title()}")
     else:
         messages.error(request, "Invalid status")
