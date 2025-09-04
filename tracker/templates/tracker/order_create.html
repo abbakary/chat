@@ -371,12 +371,36 @@
     const descEl = orderForm.querySelector('[name="description"]');
     if (descEl){ const extra = buildServiceDetails(); if(extra && !descEl.value.includes('Details:')) descEl.value = (descEl.value||'') + '\n' + extra; }
     const fd = new FormData(orderForm); fd.set('customer_id', cid); fd.set('type', (typeInput && typeInput.value) ? typeInput.value : 'service');
+
+    // Client-side quick validation for sales
+    const orderType = (typeInput && typeInput.value) ? typeInput.value : 'service';
+    if (orderType === 'sales'){
+      const item = (selItem && selItem.value || '').trim();
+      const brand = (selBrand && selBrand.value || '').trim();
+      const qty = parseInt((qtyInput && qtyInput.value) || '0', 10);
+      if (!item || !brand || !(qty > 0)){
+        notify('Item, brand and valid quantity are required','warning');
+        return;
+      }
+    }
+
     try{
-      const r = await fetch(orderForm.action, { method:'POST', headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCSRF() }, body: fd });
-      if(!r.ok){ const txt = await r.text(); throw new Error(txt || ('HTTP '+r.status)); }
-      let data = null; const ct = r.headers.get('content-type')||'';
-      if (ct.includes('application/json')){ data = await r.json(); }
-      else { const txt = await r.text(); throw new Error(txt || 'Unexpected response'); }
+      const r = await fetch(orderForm.action, {
+        method:'POST',
+        headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCSRF(), 'Accept':'application/json' },
+        credentials: 'same-origin',
+        body: fd
+      });
+      let data = null;
+      const ct = r.headers.get('content-type')||'';
+      if (ct.includes('application/json')){
+        data = await r.json();
+      } else {
+        const txt = await r.text();
+        if(!r.ok){ throw new Error(txt || ('HTTP '+r.status)); }
+        // Try to parse anyway
+        try { data = JSON.parse(txt); } catch(parseErr){ throw new Error(txt || 'Unexpected response'); }
+      }
       if(data && data.success){
         notify('Order created successfully','success');
         const target = data.order_id ? '{% url 'tracker:order_detail' 0 %}'.replace('/0/','/'+data.order_id+'/') : '{% url 'tracker:orders_list' %}';
@@ -389,7 +413,7 @@
         }
       }
     }catch(e){
-      notify('Request failed. Please try again.','danger');
+      notify((e && e.message) ? e.message : 'Request failed. Please try again.','danger');
     }
   });
 
