@@ -129,6 +129,9 @@
                 <a class="sidebar-link sidebar-title" href="#"><span>Admin</span></a>
                 <ul class="sidebar-submenu">
                   <li><a href="{% url 'tracker:users_list' %}">Users</a></li>
+                  <li><a href="{% url 'tracker:system_settings' %}">System Settings</a></li>
+                  <li><a href="{% url 'tracker:audit_logs' %}">Audit Logs</a></li>
+                  <li><a href="{% url 'tracker:backup_restore' %}">Backup &amp; Restore</a></li>
                 </ul>
               </li>
               {% endif %}
