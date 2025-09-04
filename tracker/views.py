@@ -1294,6 +1294,10 @@ def update_inquiry_status(request: HttpRequest, pk: int):
                 inquiry.completed_at = timezone.now()
 
             inquiry.save()
+            try:
+                add_audit_log(request.user, 'inquiry_status_update', f"Inquiry #{inquiry.id}: {old_status} -> {new_status}")
+            except Exception:
+                pass
 
             status_display = {
                 'created': 'New',
