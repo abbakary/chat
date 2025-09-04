@@ -21,7 +21,9 @@ from .forms import (
     VehicleForm,
     OrderForm,
     CustomerEditForm,
+    SystemSettingsForm,
 )
+from .utils import add_audit_log, get_audit_logs, clear_audit_logs
 
 
 class CustomLoginView(LoginView):
@@ -34,6 +36,13 @@ class CustomLoginView(LoginView):
             self.request.session.set_expiry(0)
         else:
             self.request.session.set_expiry(60 * 60 * 24 * 14)
+        try:
+            from .signals import _client_ip  # reuse helper
+            ip = _client_ip(self.request)
+            ua = (self.request.META.get('HTTP_USER_AGENT') or '')[:200]
+            add_audit_log(self.request.user, 'login', f'Login at {timezone.localtime().strftime("%Y-%m-%d %H:%M:%S")} from {ip or "?"} UA: {ua}')
+        except Exception:
+            pass
         return response
 
     def get_success_url(self):
@@ -166,14 +175,39 @@ def dashboard(request: HttpRequest):
 @login_required
 @login_required
 def customers_list(request: HttpRequest):
+    from django.db.models import Q
     q = request.GET.get('q','').strip()
+    f_type = request.GET.get('type','').strip()
+    f_status = request.GET.get('status','').strip()
+
     qs = Customer.objects.all().order_by('-registration_date')
     if q:
-        qs = qs.filter(full_name__icontains=q)
+        qs = qs.filter(
+            Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(email__icontains=q) | Q(code__icontains=q)
+        )
+    if f_type:
+        qs = qs.filter(customer_type=f_type)
+    if f_status == 'active':
+        qs = qs.filter(total_visits__gt=0)
+    elif f_status == 'inactive':
+        qs = qs.filter(total_visits__lte=0)
+
+    # Stats
+    today = timezone.localdate()
+    active_customers = Customer.objects.filter(arrival_time__date=today).count()
+    new_customers_today = Customer.objects.filter(registration_date__date=today).count()
+    returning_customers = Customer.objects.filter(total_visits__gt=1).count()
+
     paginator = Paginator(qs, 20)
     page = request.GET.get('page')
     customers = paginator.get_page(page)
-    return render(request, "tracker/customers_list.html", {"customers": customers, "q": q})
+    return render(request, "tracker/customers_list.html", {
+        "customers": customers,
+        "q": q,
+        "active_customers": active_customers,
+        "new_customers_today": new_customers_today,
+        "returning_customers": returning_customers,
+    })
 
 
 @login_required
@@ -322,7 +356,8 @@ def customer_register(request: HttpRequest):
                 o.save()
                 if o.type == 'sales':
                     from .utils import adjust_inventory
-                    adjust_inventory(o.item_name, o.brand, -(o.quantity or 0))
+                    qty_int = int(o.quantity or 0)
+                    adjust_inventory(o.item_name, o.brand, -qty_int)
                 for key in ["reg_step1", "reg_step2", "reg_step3"]:
                     request.session.pop(key, None)
                 messages.success(request, "Customer registered and order created successfully")
@@ -389,7 +424,8 @@ def create_order_for_customer(request: HttpRequest, pk: int):
             o.save()
             # Deduct inventory after save
             if o.type == 'sales':
-                ok, _, remaining = adjust_inventory(o.item_name, o.brand, -(o.quantity or 0))
+                qty_int = int(o.quantity or 0)
+                ok, _, remaining = adjust_inventory(o.item_name, o.brand, -qty_int)
                 if ok:
                     messages.success(request, f"Order created. Remaining stock for {o.item_name} ({o.brand}): {remaining}")
                 else:
@@ -407,17 +443,54 @@ def create_order_for_customer(request: HttpRequest, pk: int):
 
 @login_required
 def orders_list(request: HttpRequest):
+    from django.db.models import Q, Sum
     status = request.GET.get("status", "all")
     type_ = request.GET.get("type", "all")
+    priority = request.GET.get("priority", "")
+    date_range = request.GET.get("date_range", "")
+    customer_id = request.GET.get("customer", "")
+
     qs = Order.objects.select_related("customer", "vehicle").order_by("-created_at")
-    if status != "all":
+    if status != "all" and status:
         qs = qs.filter(status=status)
-    if type_ != "all":
+    if type_ != "all" and type_:
         qs = qs.filter(type=type_)
+    if priority:
+        qs = qs.filter(priority=priority)
+    if customer_id:
+        qs = qs.filter(customer_id=customer_id)
+    if date_range == 'today':
+        qs = qs.filter(created_at__date=timezone.localdate())
+    elif date_range == 'week':
+        start = timezone.localdate() - timezone.timedelta(days=6)
+        qs = qs.filter(created_at__date__gte=start)
+    elif date_range == 'month':
+        start = timezone.localdate().replace(day=1)
+        qs = qs.filter(created_at__date__gte=start)
+
+    # Stats (global snapshot)
+    today = timezone.localdate()
+    total_orders = Order.objects.count()
+    pending_orders = Order.objects.filter(status__in=['created','assigned']).count()
+    active_orders = Order.objects.filter(status__in=['in_progress']).count()
+    completed_today = Order.objects.filter(status='completed', completed_at__date=today).count()
+    urgent_orders = Order.objects.filter(priority='urgent').exclude(status='completed').count()
+    revenue_today = 0
+
     paginator = Paginator(qs, 20)
     page = request.GET.get('page')
     orders = paginator.get_page(page)
-    return render(request, "tracker/orders_list.html", {"orders": orders, "status": status, "type": type_})
+    return render(request, "tracker/orders_list.html", {
+        "orders": orders,
+        "status": status,
+        "type": type_,
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "active_orders": active_orders,
+        "completed_today": completed_today,
+        "urgent_orders": urgent_orders,
+        "revenue_today": revenue_today,
+    })
 
 
 @login_required
@@ -450,12 +523,12 @@ def order_start(request: HttpRequest):
             'status': 'created',
             'description': request.POST.get('description', ''),
             'estimated_duration': request.POST.get('estimated_duration') or None,
-            'item_name': request.POST.get('item_name', ''),
-            'brand': request.POST.get('brand', ''),
-            'quantity': request.POST.get('quantity') or None,
-            'inquiry_type': request.POST.get('inquiry_type', ''),
+            'item_name': (request.POST.get('item_name') or '').strip(),
+            'brand': (request.POST.get('brand') or '').strip(),
+            'quantity': None,
+            'inquiry_type': (request.POST.get('inquiry_type') or '').strip(),
             'questions': request.POST.get('questions', ''),
-            'contact_preference': request.POST.get('contact_preference', ''),
+            'contact_preference': (request.POST.get('contact_preference') or '').strip(),
             'follow_up_date': request.POST.get('follow_up_date') or None,
         }
         vehicle_id = request.POST.get('vehicle')
@@ -466,21 +539,27 @@ def order_start(request: HttpRequest):
             name = (order_data.get('item_name') or '').strip()
             brand = (order_data.get('brand') or '').strip()
             try:
-                qty = int(order_data.get('quantity') or 0)
+                qty = int(request.POST.get('quantity') or 0)
             except (TypeError, ValueError):
                 qty = 0
             if not name or not brand or qty <= 0:
                 return JsonResponse({'success': False, 'message': 'Item, brand and valid quantity are required', 'code': 'invalid'})
-            item = InventoryItem.objects.filter(name=name, brand=brand).first()
-            if not item:
+            from django.db.models import Q, Sum
+            if (brand or '').lower() == 'unbranded':
+                available = InventoryItem.objects.filter(name=name).filter(Q(brand__isnull=True) | Q(brand="")).aggregate(total=Sum('quantity')).get('total') or 0
+            else:
+                available = InventoryItem.objects.filter(name=name, brand=brand).aggregate(total=Sum('quantity')).get('total') or 0
+            if available <= 0:
                 return JsonResponse({'success': False, 'message': 'Item not found in inventory', 'code': 'not_found'})
-            if item.quantity < qty:
-                return JsonResponse({'success': False, 'message': f'Only {item.quantity} in stock for {name} ({brand})', 'code': 'insufficient_stock', 'available': item.quantity})
+            if available < qty:
+                return JsonResponse({'success': False, 'message': f'Only {available} in stock for {name} ({brand})', 'code': 'insufficient_stock', 'available': available})
+            order_data['quantity'] = qty
         order = Order.objects.create(**order_data)
         remaining = None
         if order.type == 'sales':
             from .utils import adjust_inventory
-            ok, status, rem = adjust_inventory(order.item_name, order.brand, -(order.quantity or 0))
+            qty_int = int(order.quantity or 0)
+            ok, status, rem = adjust_inventory(order.item_name, order.brand, -qty_int)
             remaining = rem if ok else None
         return JsonResponse({'success': True, 'message': 'Order created successfully', 'order_id': order.id, 'remaining': remaining})
 
@@ -515,7 +594,8 @@ def order_start(request: HttpRequest):
         o.save()
         if o.type == 'sales':
             from .utils import adjust_inventory
-            ok, status, remaining = adjust_inventory(o.item_name, o.brand, -(o.quantity or 0))
+            qty_int = int(o.quantity or 0)
+            ok, status, remaining = adjust_inventory(o.item_name, o.brand, -qty_int)
             if ok:
                 messages.success(request, f"Order created. Remaining stock for {o.item_name} ({o.brand}): {remaining}")
             else:
@@ -560,6 +640,10 @@ def update_order_status(request: HttpRequest, pk: int):
                 from .utils import adjust_inventory
                 adjust_inventory(o.item_name, o.brand, (o.quantity or 0))
         o.save()
+        try:
+            add_audit_log(request.user, 'order_status_update', f"Order {o.order_number}: {o.status}")
+        except Exception:
+            pass
         messages.success(request, f"Order status updated to {status.replace('_',' ').title()}")
     else:
         messages.error(request, "Invalid status")
@@ -885,6 +969,10 @@ def inventory_create(request: HttpRequest):
             item = form.save()
             from .utils import clear_inventory_cache
             clear_inventory_cache(item.name, item.brand)
+            try:
+                add_audit_log(request.user, 'inventory_create', f"Item '{item.name}' ({item.brand or 'Unbranded'}) qty={item.quantity}")
+            except Exception:
+                pass
             messages.success(request, 'Inventory item created')
             return redirect('tracker:inventory_list')
         else:
@@ -904,6 +992,10 @@ def inventory_edit(request: HttpRequest, pk: int):
             item = form.save()
             from .utils import clear_inventory_cache
             clear_inventory_cache(item.name, item.brand)
+            try:
+                add_audit_log(request.user, 'inventory_update', f"Item '{item.name}' ({item.brand or 'Unbranded'}) now qty={item.quantity}")
+            except Exception:
+                pass
             messages.success(request, 'Inventory item updated')
             return redirect('tracker:inventory_list')
         else:
@@ -921,6 +1013,10 @@ def inventory_delete(request: HttpRequest, pk: int):
         name, brand = item.name, item.brand
         item.delete()
         clear_inventory_cache(name, brand)
+        try:
+            add_audit_log(request.user, 'inventory_delete', f"Deleted item '{name}' ({brand or 'Unbranded'})")
+        except Exception:
+            pass
         messages.success(request, 'Inventory item deleted')
         return redirect('tracker:inventory_list')
     return render(request, 'tracker/inventory_delete.html', { 'item': item })
@@ -953,13 +1049,31 @@ def users_list(request: HttpRequest):
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
+def user_create(request: HttpRequest):
+    from .forms import AdminUserCreateForm
+    if request.method == 'POST':
+        form = AdminUserCreateForm(request.POST)
+        if form.is_valid():
+            new_user = form.save()
+            add_audit_log(request.user, 'user_create', f'Created user {new_user.username}')
+            messages.success(request, 'User created')
+            return redirect('tracker:users_list')
+        else:
+            messages.error(request, 'Please correct errors and try again')
+    else:
+        form = AdminUserCreateForm()
+    return render(request, 'tracker/user_create.html', { 'form': form })
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
 def user_edit(request: HttpRequest, pk: int):
     from .forms import AdminUserForm
     u = get_object_or_404(User, pk=pk)
     if request.method == 'POST':
         form = AdminUserForm(request.POST, instance=u)
         if form.is_valid():
-            form.save()
+            updated_user = form.save()
+            add_audit_log(request.user, 'user_update', f'Updated user {updated_user.username}')
             messages.success(request, 'User updated')
             return redirect('tracker:users_list')
         else:
@@ -976,6 +1090,10 @@ def customer_edit(request: HttpRequest, pk: int):
         form = CustomerEditForm(request.POST, instance=customer)
         if form.is_valid():
             form.save()
+            try:
+                add_audit_log(request.user, 'customer_update', f"Updated customer {customer.full_name} ({customer.code})")
+            except Exception:
+                pass
             messages.success(request, 'Customer updated successfully')
             return redirect('tracker:customer_detail', pk=customer.id)
         else:
@@ -1009,6 +1127,11 @@ def customers_quick_create(request: HttpRequest):
                 email=email if email else None,
                 customer_type=customer_type
             )
+
+            try:
+                add_audit_log(request.user, 'customer_create', f"Created customer {customer.full_name} ({customer.code})")
+            except Exception:
+                pass
 
             return JsonResponse({
                 'success': True,
@@ -1124,12 +1247,13 @@ def inquiry_respond(request: HttpRequest, pk: int):
             messages.error(request, 'Response message is required')
             return redirect('tracker:inquiries')
 
-        # Append response to inquiry notes
+        # Append response into inquiry questions thread
         stamp = timezone.now().strftime('%Y-%m-%d %H:%M')
-        if inquiry.notes:
-            inquiry.notes += f"\n\n[{stamp}] Response: {response_text}"
+        trail = f"[{stamp}] Response: {response_text}"
+        if inquiry.questions:
+            inquiry.questions = (inquiry.questions or '') + "\n\n" + trail
         else:
-            inquiry.notes = f"[{stamp}] Response: {response_text}"
+            inquiry.questions = trail
 
         # Update follow-up date if required
         if follow_up_required and follow_up_date:
@@ -1143,6 +1267,10 @@ def inquiry_respond(request: HttpRequest, pk: int):
             inquiry.status = 'in_progress'
 
         inquiry.save()
+        try:
+            add_audit_log(request.user, 'inquiry_respond', f"Responded to inquiry #{inquiry.id} for {inquiry.customer.full_name}")
+        except Exception:
+            pass
 
         # Send SMS to the customer's phone
         phone = inquiry.customer.phone
@@ -1173,6 +1301,10 @@ def update_inquiry_status(request: HttpRequest, pk: int):
                 inquiry.completed_at = timezone.now()
 
             inquiry.save()
+            try:
+                add_audit_log(request.user, 'inquiry_status_update', f"Inquiry #{inquiry.id}: {old_status} -> {new_status}")
+            except Exception:
+                pass
 
             status_display = {
                 'created': 'New',
@@ -1190,7 +1322,7 @@ def update_inquiry_status(request: HttpRequest, pk: int):
 @login_required
 def reports_advanced(request: HttpRequest):
     """Advanced reports with period and type filters"""
-    from datetime import timedelta
+    from datetime import timedelta, datetime, time as dt_time
 
     period = request.GET.get('period', 'monthly')
     report_type = request.GET.get('type', 'overview')
@@ -1218,23 +1350,25 @@ def reports_advanced(request: HttpRequest):
         date_format = '%d'
         labels = [(start_date + timedelta(days=i)).strftime('%d') for i in range(30)]
 
+    # Compute timezone-aware datetime range [start_dt, end_dt)
+    tz = timezone.get_current_timezone()
+    start_dt = timezone.make_aware(datetime.combine(start_date, dt_time.min), tz)
+    end_dt = timezone.make_aware(datetime.combine(end_date + timedelta(days=1), dt_time.min), tz)
+
+    # Reuse filtered querysets for consistency
+    qs = Order.objects.filter(created_at__gte=start_dt, created_at__lt=end_dt)
+    cqs = Customer.objects.filter(registration_date__gte=start_dt, registration_date__lt=end_dt)
+
     # Base statistics
-    total_orders = Order.objects.filter(created_at__date__range=[start_date, end_date]).count()
-    completed_orders = Order.objects.filter(
-        created_at__date__range=[start_date, end_date],
-        status='completed'
-    ).count()
-    pending_orders = Order.objects.filter(
-        created_at__date__range=[start_date, end_date],
-        status__in=['created', 'assigned', 'in_progress']
-    ).count()
-    total_customers = Customer.objects.filter(registration_date__date__range=[start_date, end_date]).count()
+    total_orders = qs.count()
+    completed_orders = qs.filter(status='completed').count()
+    pending_orders = qs.filter(status__in=['created', 'assigned', 'in_progress']).count()
+    total_customers = cqs.count()
 
     completion_rate = int((completed_orders * 100) / total_orders) if total_orders > 0 else 0
 
     # Average duration
-    avg_duration_qs = Order.objects.filter(
-        created_at__date__range=[start_date, end_date],
+    avg_duration_qs = qs.filter(
         actual_duration__isnull=False
     ).aggregate(avg_duration=Avg('actual_duration'))
     avg_duration = int(avg_duration_qs['avg_duration'] or 0)
@@ -1249,15 +1383,9 @@ def reports_advanced(request: HttpRequest):
         'new_customers': total_customers,
         'avg_service_time': avg_duration,
         # Order type breakdown
-        'service_orders': Order.objects.filter(
-            created_at__date__range=[start_date, end_date], type='service'
-        ).count(),
-        'sales_orders': Order.objects.filter(
-            created_at__date__range=[start_date, end_date], type='sales'
-        ).count(),
-        'consultation_orders': Order.objects.filter(
-            created_at__date__range=[start_date, end_date], type='consultation'
-        ).count(),
+        'service_orders': qs.filter(type='service').count(),
+        'sales_orders': qs.filter(type='sales').count(),
+        'consultation_orders': qs.filter(type='consultation').count(),
     }
 
     # Calculate percentages
@@ -1269,7 +1397,7 @@ def reports_advanced(request: HttpRequest):
         stats['service_percentage'] = stats['sales_percentage'] = stats['consultation_percentage'] = 0
 
     # Real trend data per selected period
-    qs = Order.objects.filter(created_at__date__range=[start_date, end_date])
+    qs = Order.objects.filter(created_at__gte=start_dt, created_at__lt=end_dt)
     if period == 'daily':
         from django.db.models.functions import ExtractHour
         trend_map = {int(r['h'] or 0): r['c'] for r in qs.annotate(h=ExtractHour('created_at')).values('h').annotate(c=Count('id'))}
@@ -1304,29 +1432,22 @@ def reports_advanced(request: HttpRequest):
         'types': {
             'labels': ['Personal', 'Company', 'Government', 'NGO', 'Bodaboda'],
             'values': [
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='personal').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='company').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='government').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='ngo').count(),
-                Customer.objects.filter(registration_date__date__range=[start_date, end_date], customer_type='bodaboda').count(),
+                cqs.filter(customer_type='personal').count(),
+                cqs.filter(customer_type='company').count(),
+                cqs.filter(customer_type='government').count(),
+                cqs.filter(customer_type='ngo').count(),
+                cqs.filter(customer_type='bodaboda').count(),
             ]
         }
     }
 
     # Get data items based on report type
     if report_type == 'customers':
-        data_items = Customer.objects.filter(
-            registration_date__date__range=[start_date, end_date]
-        ).order_by('-registration_date')[:20]
+        data_items = cqs.order_by('-registration_date')[:20]
     elif report_type == 'inquiries':
-        data_items = Order.objects.filter(
-            created_at__date__range=[start_date, end_date],
-            type='consultation'
-        ).select_related('customer').order_by('-created_at')[:20]
+        data_items = qs.filter(type='consultation').select_related('customer').order_by('-created_at')[:20]
     else:
-        data_items = Order.objects.filter(
-            created_at__date__range=[start_date, end_date]
-        ).select_related('customer').order_by('-created_at')[:20]
+        data_items = qs.select_related('customer').order_by('-created_at')[:20]
 
     context = {
         'period': period,
@@ -1358,8 +1479,14 @@ def system_settings(request: HttpRequest):
     if request.method == 'POST':
         form = SystemSettingsForm(request.POST)
         if form.is_valid():
-            data = {**defaults(), **form.cleaned_data}
-            cache.set('system_settings', data, None)
+            new_data = {**defaults(), **form.cleaned_data}
+            changes = []
+            for k, old_val in (data or {}).items():
+                new_val = new_data.get(k)
+                if new_val != old_val:
+                    changes.append(f"{k}: '{old_val}' -> '{new_val}'")
+            cache.set('system_settings', new_data, None)
+            add_audit_log(request.user, 'system_settings_update', '; '.join(changes) if changes else 'No changes')
             messages.success(request, 'Settings updated')
             return redirect('tracker:system_settings')
         else:
@@ -1371,7 +1498,12 @@ def system_settings(request: HttpRequest):
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def audit_logs(request: HttpRequest):
-    logs = cache.get('audit_logs', [])
+    if request.method == 'POST' and request.POST.get('action') == 'clear':
+        clear_audit_logs()
+        add_audit_log(request.user, 'audit_logs_cleared', 'Cleared all audit logs')
+        messages.success(request, 'Audit logs cleared')
+        return redirect('tracker:audit_logs')
+    logs = get_audit_logs()
     return render(request, 'tracker/audit_logs.html', {'logs': logs})
 
 @login_required
@@ -1382,6 +1514,7 @@ def backup_restore(request: HttpRequest):
         payload = {
             'system_settings': cache.get('system_settings', {}),
         }
+        add_audit_log(request.user, 'backup_download', 'Downloaded system settings backup')
         resp = HttpResponse(json.dumps(payload, indent=2), content_type='application/json')
         resp['Content-Disposition'] = 'attachment; filename="backup.json"'
         return resp
@@ -1389,6 +1522,21 @@ def backup_restore(request: HttpRequest):
         action = request.POST.get('action')
         if action == 'reset_settings':
             cache.delete('system_settings')
+            add_audit_log(request.user, 'settings_reset', 'Reset system settings to defaults')
             messages.success(request, 'System settings have been reset to defaults')
+            return redirect('tracker:backup_restore')
+        if action == 'restore_settings' and request.FILES.get('file'):
+            f = request.FILES['file']
+            try:
+                data = json.load(f)
+                settings_data = data.get('system_settings') or {}
+                if isinstance(settings_data, dict):
+                    cache.set('system_settings', settings_data, None)
+                    add_audit_log(request.user, 'settings_restored', 'Restored system settings from uploaded backup')
+                    messages.success(request, 'Settings restored from backup')
+                else:
+                    messages.error(request, 'Invalid backup file format')
+            except Exception as e:
+                messages.error(request, f'Failed to restore: {e}')
             return redirect('tracker:backup_restore')
     return render(request, 'tracker/backup_restore.html')

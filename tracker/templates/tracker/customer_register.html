@@ -1,0 +1,532 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}Customer Registration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/select2.css' %}">
+<link rel="stylesheet" href="{% static 'css/vendors/flatpickr/flatpickr.min.css' %}">
+<style>
+  .step-indicator{display:flex;justify-content:space-between;margin-bottom:2rem;position:relative}
+  .step-indicator::before{content:'';position:absolute;top:20px;left:0;right:0;height:2px;background:#e9ecef;z-index:1}
+  .step-indicator .step{background:#fff;border:2px solid #e9ecef;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:600;position:relative;z-index:2;transition:all .3s ease}
+  .step-indicator .step.active{background:var(--bs-primary);color:#fff;border-color:var(--bs-primary)}
+  .step-indicator .step.completed{background:var(--bs-success);border-color:var(--bs-success);color:#fff}
+  .step-label{text-align:center;margin-top:.5rem;font-size:.85rem;color:#6c757d}
+  .step-label.active{color:var(--bs-primary);font-weight:600}
+  .form-section{background:#f8f9fa;border-radius:8px;padding:1.5rem;margin-bottom:1rem}
+  .section-title{color:var(--bs-primary);font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+  .intent-card{cursor:pointer;transition:all .3s ease;border:2px solid transparent}
+  .intent-card:hover{border-color:var(--bs-primary);box-shadow:0 4px 8px rgba(0,123,255,.15)}
+  .intent-card.selected{border-color:var(--bs-primary);background:rgba(0,123,255,.05)}
+  .service-type-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
+  .service-card{border:2px solid #e9ecef;border-radius:8px;padding:1rem;cursor:pointer;transition:all .3s ease}
+  .service-card:hover{border-color:var(--bs-primary);transform:translateY(-2px)}
+  .service-card.selected{border-color:var(--bs-primary);background:rgba(0,123,255,.05)}
+  .customer-summary{background:#e3f2fd;border-radius:8px;padding:1rem;margin-bottom:1rem}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-1">Customer Registration</h3>
+      <p class="text-muted mb-0">Complete multi-step customer registration and service setup</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'tracker:customers_list' %}" class="btn btn-outline-secondary">
+        <i data-feather="users" class="me-1"></i>All Customers
+      </a>
+    </div>
+  </div>
+
+  <div class="step-indicator">
+    <div class="step-item">
+      <div class="step {% if step == 1 or step == '1' %}active{% elif step > 1 %}completed{% endif %}">1</div>
+      <div class="step-label {% if step == 1 or step == '1' %}active{% endif %}">Basic Information</div>
+    </div>
+    <div class="step-item">
+      <div class="step {% if step == 2 or step == '2' %}active{% elif step > 2 %}completed{% endif %}">2</div>
+      <div class="step-label {% if step == 2 or step == '2' %}active{% endif %}">Service Intent</div>
+    </div>
+    <div class="step-item">
+      <div class="step {% if step == 3 or step == '3' %}active{% elif step > 3 %}completed{% endif %}">3</div>
+      <div class="step-label {% if step == 3 or step == '3' %}active{% endif %}">Service Type</div>
+    </div>
+    <div class="step-item">
+      <div class="step {% if step == 4 or step == '4' %}active{% endif %}">4</div>
+      <div class="step-label {% if step == 4 or step == '4' %}active{% endif %}">Details & Review</div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <form method="post" class="card-body">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="{{ step }}">
+
+      {% if step == 1 or step == '1' %}
+        <div class="form-section">
+          <h5 class="section-title">
+            <i data-feather="user" class="feather-16"></i>
+            Customer Basic Information
+          </h5>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+              {{ form.full_name }}
+              {% for error in form.full_name.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Phone Number <span class="text-danger">*</span></label>
+              {{ form.phone }}
+              {% for error in form.phone.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+              <div class="form-text">Format: +250XXXXXXXXX</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Email Address</label>
+              {{ form.email }}
+              {% for error in form.email.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+              <div class="form-text">Optional - for digital communications</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Address</label>
+              {{ form.address }}
+              <div class="form-text">Customer's physical location</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Additional Notes</label>
+              {{ form.notes }}
+              <div class="form-text">Any special information about this customer</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <div></div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" name="action" value="save_customer" type="submit">
+              <i data-feather="save" class="me-1"></i>Save Customer Only
+            </button>
+            <button class="btn btn-primary" type="submit">
+              Next Step <i data-feather="arrow-right" class="ms-1"></i>
+            </button>
+          </div>
+        </div>
+
+      {% elif step == 2 or step == '2' %}
+        <div class="form-section">
+          <h5 class="section-title">
+            <i data-feather="help-circle" class="feather-16"></i>
+            What brings you here today?
+          </h5>
+          <div class="row g-3">
+            {% for value, label in form.fields.intent.choices %}
+              <div class="col-md-4">
+                <div class="intent-card card h-100 p-0" data-intent="{{ value }}">
+                  <div class="card-body d-flex align-items-center">
+                    <input class="form-check-input me-3" type="radio" name="intent" id="intent_{{ forloop.counter }}" value="{{ value }}" {% if form.initial.intent == value or form.data.intent == value %}checked{% endif %}>
+                    <div>
+                      <h6 class="mb-1 text-capitalize">{{ label }}</h6>
+                      <small class="text-muted">
+                        {% if value == 'service' %}I need car maintenance or repair services
+                        {% elif value == 'sales' %}I want to purchase tires or parts
+                        {% else %}I have questions or need information{% endif %}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <a class="btn btn-outline-secondary" href="?step=1">
+            <i data-feather="arrow-left" class="me-1"></i>Back
+          </a>
+          <button class="btn btn-primary" type="submit">
+            Next Step <i data-feather="arrow-right" class="ms-1"></i>
+          </button>
+        </div>
+
+      {% elif step == 3 or step == '3' %}
+        {% if intent == 'service' %}
+          <div class="form-section">
+            <h5 class="section-title">
+              <i data-feather="tool" class="feather-16"></i>
+              Select Services Needed
+            </h5>
+            <div class="row g-2">
+              <div class="col-12">
+                {{ form.service_type }}
+              </div>
+            </div>
+            {% for error in form.service_type.errors %}
+              <div class="text-danger small mt-2">{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% elif intent == 'sales' %}
+          <div class="form-section">
+            <h5 class="section-title">
+              <i data-feather="shopping-cart" class="feather-16"></i>
+              Select Sales Type
+            </h5>
+            <div class="service-type-grid">
+              {% for value, label in form.sales_type.field.choices %}
+                <div class="service-card" data-sales="{{ value }}">
+                  <input class="form-check-input" type="radio" name="sales_type" id="sales_{{ forloop.counter }}" value="{{ value }}" {% if form.sales_type.value == value %}checked{% endif %}>
+                  <label class="form-check-label ms-2 fw-semibold" for="sales_{{ forloop.counter }}">{{ label }}</label>
+                  <div class="small text-muted mt-1">
+                    {% if value == 'tire_sales' %}All types of tire sales
+                    {% elif value == 'parts_sales' %}Car parts and accessories
+                    {% elif value == 'oil_sales' %}Oil and fluids
+                    {% elif value == 'battery_sales' %}Batteries
+                    {% elif value == 'accessories' %}Accessories and addons
+                    {% else %}Other automotive products{% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+            {% for error in form.sales_type.errors %}
+              <div class="text-danger small mt-2">{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="form-section">
+            <h5 class="section-title">
+              <i data-feather="message-circle" class="feather-16"></i>
+              Inquiry Setup
+            </h5>
+            <div class="alert alert-info">
+              <i data-feather="info" class="me-2"></i>
+              Perfect! We'll help you with your inquiry. Proceed to the next step to provide details.
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="d-flex justify-content-between">
+          <a class="btn btn-outline-secondary" href="?step=2">
+            <i data-feather="arrow-left" class="me-1"></i>Back
+          </a>
+          <button class="btn btn-primary" type="submit">
+            Next Step <i data-feather="arrow-right" class="ms-1"></i>
+          </button>
+        </div>
+
+      {% else %}
+        <div class="customer-summary">
+          <h6 class="mb-2">
+            <i data-feather="user-check" class="me-1"></i>Customer Summary
+          </h6>
+          <div class="row">
+            <div class="col-md-8">
+              <strong>{{ step1.full_name|default:"Customer Name" }}</strong> - {{ step1.phone|default:"Phone Number" }}
+              {% if step1.email %}<br><small>{{ step1.email }}</small>{% endif %}
+            </div>
+            <div class="col-md-4 text-end">
+              <span class="badge bg-primary">{{ intent|default:"service"|title }} Request</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="form-section">
+              <h5 class="section-title">
+                <i data-feather="users" class="feather-16"></i>
+                Customer Classification
+              </h5>
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Customer Type</label>
+                {{ form.customer_type }}
+              </div>
+              <div id="orgFields" style="display:none">
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Organization Name</label>
+                  {{ form.organization_name }}
+                </div>
+                <div class="mb-0">
+                  <label class="form-label fw-semibold">Tax Number</label>
+                  {{ form.tax_number }}
+                </div>
+              </div>
+              <div id="personalFields" style="display:none">
+                <div class="mb-0">
+                  <label class="form-label fw-semibold">Personal Type</label>
+                  {{ form.personal_subtype }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="form-section">
+              <h5 class="section-title">
+                <i data-feather="truck" class="feather-16"></i>
+                Vehicle Information (Optional)
+              </h5>
+              {% for field in vehicle_form %}
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">{{ field.label }}</label>
+                  {{ field }}
+                  {% for error in field.errors %}
+                    <div class="text-danger small mt-1">{{ error }}</div>
+                  {% endfor %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h5 class="section-title">
+            <i data-feather="file-plus" class="feather-16"></i>
+            Create Initial Order
+          </h5>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              {% if intent == 'service' %}
+                <label class="form-label fw-semibold">Request Type</label>
+                <div><span class="badge bg-primary">Service</span></div>
+                <input type="hidden" name="type" value="service">
+              {% elif intent == 'sales' %}
+                <label class="form-label fw-semibold">Request Type</label>
+                <div><span class="badge bg-success">Sales</span></div>
+                <input type="hidden" name="type" value="sales" id="id_type">
+              {% elif intent == 'inquiry' %}
+                <label class="form-label fw-semibold">Request Type</label>
+                <div><span class="badge bg-info text-dark">Consultation</span></div>
+                <input type="hidden" name="type" value="consultation">
+              {% else %}
+                <label class="form-label fw-semibold">Order Type</label>
+                {{ order_form.type }}
+              {% endif %}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Priority Level</label>
+              {{ order_form.priority }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Vehicle</label>
+              {{ order_form.vehicle }}
+            </div>
+          </div>
+
+          <div class="row g-3">
+            {% if intent == 'service' %}
+              <div class="col-lg-6">
+                <div id="serviceFields" class="card">
+                  <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i data-feather="tool" class="me-1"></i>Service Details</h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Services Required</label>
+                      <div class="row g-2">
+                        {% for cb in order_form.service_selection %}
+                          <div class="col-sm-6">
+                            <div class="form-check">{{ cb.tag }}
+                              <label class="form-check-label" for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label>
+                            </div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <div class="form-text">Select all services needed</div>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Estimated Duration (minutes)</label>
+                      {{ order_form.estimated_duration }}
+                      <div class="form-text">How long will this take?</div>
+                    </div>
+                    <div class="mb-0">
+                      <label class="form-label fw-semibold">Problem Description</label>
+                      {{ order_form.description }}
+                      <div class="form-text">Describe the issue or service needed</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% elif intent == 'sales' %}
+              <div class="col-12">
+                <div id="salesFields" class="card">
+                  <div class="card-header bg-success text-white">
+                    <h6 class="mb-0"><i data-feather="shopping-cart" class="me-1"></i>Sales Details</h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <div class="mb-3">
+                          <label class="form-label fw-semibold">Item Name</label>
+                          {{ order_form.item_name }}
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="mb-3">
+                          <label class="form-label fw-semibold">Brand</label>
+                          {{ order_form.brand }}
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="mb-3">
+                          <label class="form-label fw-semibold">Quantity</label>
+                          {{ order_form.quantity }}
+                          <div class="form-text" id="regStockHint"></div>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="mb-3">
+                          <label class="form-label fw-semibold">Tire Condition</label>
+                          {{ order_form.tire_type }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% elif intent == 'inquiry' %}
+              <div class="col-lg-6">
+                <div id="inquiryFields" class="card">
+                  <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i data-feather="message-circle" class="me-1"></i>Inquiry Details</h6>
+                  </div>
+                  <div class="card-body">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Inquiry Type</label>
+                      {{ order_form.inquiry_type }}
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Questions</label>
+                      {{ order_form.questions }}
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold">Contact Preference</label>
+                      {{ order_form.contact_preference }}
+                    </div>
+                    <div class="mb-0">
+                      <label class="form-label fw-semibold">Follow-up Date</label>
+                      {{ order_form.follow_up_date }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          <a class="btn btn-outline-secondary" href="?step=3">
+            <i data-feather="arrow-left" class="me-1"></i>Back
+          </a>
+          <button class="btn btn-success btn-lg" type="submit">
+            <i data-feather="check-circle" class="me-1"></i>Complete Registration
+          </button>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/select2/select2.full.min.js' %}"></script>
+<script src="{% static 'js/flat-pickr/flatpickr.js' %}"></script>
+<script>
+(function(){
+  'use strict';
+
+  const $ = window.jQuery;
+  if ($ && $.fn.select2) { $('select').select2({width:'100%'}); }
+  if (window.flatpickr) { document.querySelectorAll('input[type="date"]').forEach(el => flatpickr(el,{dateFormat:'Y-m-d',altInput:true,altFormat:'F j, Y'})); }
+
+  const form = document.querySelector('form');
+  const step = parseInt('{{ step|default:1 }}', 10);
+  const key = `customer_reg_draft_step_${step}`;
+  try { const draft = JSON.parse(localStorage.getItem(key)||'{}'); Object.entries(draft).forEach(([n,v])=>{ if(n==='csrfmiddlewaretoken')return; const el=form.querySelector(`[name="${n}"]`); if(!el)return; if(el.type==='checkbox'||el.type==='radio'){ el.checked=!!v; } else { el.value=v; } }); } catch(e){}
+  function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,a), wait); }; }
+  form?.addEventListener('input', debounce(()=>{ const data={}; form.querySelectorAll('input,select,textarea').forEach(el=>{ if(el.name && el.name!=='csrfmiddlewaretoken'){ data[el.name]=(el.type==='checkbox'||el.type==='radio')?el.checked:el.value; }}); localStorage.setItem(key, JSON.stringify(data)); }, 400));
+
+  document.querySelectorAll('.intent-card').forEach(card=>{ const r=card.querySelector('input[type="radio"]'); card.addEventListener('click',()=>{ document.querySelectorAll('.intent-card').forEach(c=>c.classList.remove('selected')); if(r){ r.checked=true; card.classList.add('selected'); } }); if(r?.checked){ card.classList.add('selected'); } });
+  document.querySelectorAll('.service-card').forEach(card=>{ const r=card.querySelector('input[type="radio"]'); card.addEventListener('click',()=>{ document.querySelectorAll('.service-card').forEach(c=>c.classList.remove('selected')); if(r){ r.checked=true; card.classList.add('selected'); } }); if(r?.checked){ card.classList.add('selected'); } });
+
+  const customerTypeSelect=document.querySelector('[name="customer_type"]');
+  const orgFields=document.getElementById('orgFields');
+  const personalFields=document.getElementById('personalFields');
+  function setDisabled(container,disabled){ if(!container)return; container.querySelectorAll('input,select,textarea').forEach(el=>{ el.disabled=!!disabled; if(disabled){ if(el.type==='checkbox'||el.type==='radio') el.checked=false; else el.value=''; }}); }
+  function updateCustomerTypeFields(){
+    const t = customerTypeSelect?.value || '';
+    const isOrg = ['government','ngo','company'].includes(t);
+    const showPersonal = ['personal','bodaboda'].includes(t);
+    const requireSubtype = t === 'personal';
+    if (orgFields){
+      orgFields.style.display = isOrg ? '' : 'none';
+      setDisabled(orgFields, !isOrg);
+      const orgName = document.querySelector('[name="organization_name"]');
+      const tax = document.querySelector('[name="tax_number"]');
+      if (orgName) orgName.required = isOrg;
+      if (tax) tax.required = isOrg;
+    }
+    if (personalFields){
+      personalFields.style.display = showPersonal ? '' : 'none';
+      setDisabled(personalFields, !showPersonal);
+      const subtype = document.querySelector('[name="personal_subtype"]');
+      if (subtype) subtype.required = requireSubtype;
+    }
+  }
+  customerTypeSelect?.addEventListener('change', updateCustomerTypeFields);
+  if ($ && $.fn.select2 && customerTypeSelect){ $(customerTypeSelect).on('change.select2', updateCustomerTypeFields); }
+  updateCustomerTypeFields();
+
+  const intentType = '{% if intent == "service" %}service{% elif intent == "sales" %}sales{% elif intent == "inquiry" %}consultation{% else %}{% endif %}';
+  function setReq(sel, req){ const el=document.querySelector(sel); if(el) el.required=!!req; }
+  setReq('[name="description"]', intentType==='service');
+  setReq('[name="estimated_duration"]', intentType==='service');
+  setReq('[name="item_name"]', intentType==='sales');
+  setReq('[name="brand"]', intentType==='sales');
+  setReq('[name="quantity"]', intentType==='sales');
+  setReq('[name="inquiry_type"]', intentType==='consultation');
+  setReq('[name="questions"]', intentType==='consultation');
+
+  // Inventory integration for sales step
+  (function(){ if (intentType !== 'sales') return;
+    const selItem = form.querySelector('[name="item_name"]');
+    const selBrand = form.querySelector('[name="brand"]');
+    const qtyInput = form.querySelector('[name="quantity"]');
+    const stockHint = document.getElementById('regStockHint');
+    async function apiGet(url){ try{ const r=await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } catch(e){ return {}; } }
+    function setOptions(select, items, placeholder){
+      const current = (window.jQuery && jQuery.fn.select2) ? jQuery(select).val() : select.value;
+      if (window.jQuery && jQuery.fn.select2){
+        jQuery(select).empty().append(new Option(placeholder, '', true, false));
+        items.forEach(i=>{ jQuery(select).append(new Option(i.label, i.value, false, false)); });
+        jQuery(select).trigger('change.select2');
+      } else {
+        const opts = [`<option value=\"\">${placeholder}</option>`].concat(items.map(i=>`<option value=\"${i.value}\">${i.label}</option>`));
+        select.innerHTML = opts.join('');
+      }
+      if (items.some(i=>i.value===current)) { if (window.jQuery && jQuery.fn.select2) { jQuery(select).val(current).trigger('change.select2'); } else { select.value = current; } } else { if (window.jQuery && jQuery.fn.select2) { jQuery(select).val('').trigger('change.select2'); } else { select.value = ''; } }
+    }
+    async function loadBrands(){ const name=(selItem?.value||'').trim(); if(!selBrand) return; if(!name){ setOptions(selBrand, [], 'Select brand'); updateStock(); return; } const data = await apiGet(`{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}`); const brands = (data.brands||[]).map(b=>({ value: (b.brand && b.brand.trim()) || 'Unbranded', label: ((b.brand && b.brand.trim()) || 'Unbranded') + (b.quantity? ` (qty: ${b.quantity})`: '') })); setOptions(selBrand, brands, 'Select brand'); updateStock(); }
+    async function updateStock(){ if(!selItem||!selBrand||!qtyInput||!stockHint) return; const name=(selItem.value||'').trim(); const brand=(selBrand.value||'').trim(); if(!name||!brand){ stockHint.textContent=''; qtyInput.removeAttribute('max'); return; } const data = await apiGet(`{% url 'tracker:api_inventory_stock' %}?name=${encodeURIComponent(name)}&brand=${encodeURIComponent(brand)}`); const available = parseInt(data.available||0,10); if(available>=0){ stockHint.textContent = `Available: ${available}`; qtyInput.max = available>0? available: null; if(available>0 && (!qtyInput.value || parseInt(qtyInput.value,10)<=0)){ qtyInput.value = 1; } } }
+    selItem?.addEventListener('change', loadBrands);
+    selBrand?.addEventListener('change', updateStock);
+    qtyInput?.addEventListener('input', ()=>{ const max = parseInt(qtyInput.max||0,10); if(max && parseInt(qtyInput.value||0,10) > max){ qtyInput.value = max; } });
+
+    // Enable search and free typing
+    if (window.jQuery && jQuery.fn.select2){
+      if (selItem){ try{ jQuery(selItem).select2('destroy'); }catch(e){} jQuery(selItem).select2({ width:'100%', placeholder:'Select item', allowClear:true, tags:true, selectOnClose:true }); }
+      if (selBrand){ try{ jQuery(selBrand).select2('destroy'); }catch(e){} jQuery(selBrand).select2({ width:'100%', placeholder:'Select brand', allowClear:true, tags:true, selectOnClose:true }); }
+    }
+
+    if (selItem && selItem.value){ loadBrands(); }
+  })();
+
+  if (window.feather) { feather.replace(); }
+})();
+</script>
+{% endblock %}

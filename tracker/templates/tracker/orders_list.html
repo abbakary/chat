@@ -7,10 +7,11 @@
 <link rel="stylesheet" href="{% static 'css/datatables.css' %}">
 <style>
   .page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: #ffffff;
+    color: inherit;
     border-radius: 12px;
     margin-bottom: 2rem;
+    border: 1px solid #e9ecef;
   }
   .filters-card {
     border-radius: 12px;
@@ -108,6 +109,13 @@
     font-size: 0.8rem;
     color: #6c757d;
   }
+  .page-header .card-body { overflow: visible; position: relative; }
+  .orders-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+  .orders-header-title { flex: 1 1 auto; min-width: 180px; }
+  .orders-header-actions { display: flex; flex-wrap: wrap; gap: .5rem; flex: 0 0 auto; max-width: 100%; overflow: visible; position: relative; z-index: 2; }
+  .orders-header-actions .btn { white-space: nowrap; }
+  @media (max-width: 992px) { .orders-header-actions { width: 100%; justify-content: flex-start; } }
+  @media (max-width: 576px) { .orders-header-actions .btn { width: 100%; } }
 </style>
 {% endblock %}
 
@@ -116,17 +124,17 @@
   <!-- Page Header -->
   <div class="page-header card">
     <div class="card-body">
-      <div class="d-flex justify-content-between align-items-start">
-        <div>
-          <h3 class="mb-2">Order Management</h3>
-          <p class="mb-0 opacity-75">Track and manage all service, sales, and consultation orders</p>
-        </div>
-        <div class="d-flex gap-2">
-          <a class="btn btn-light" href="{% url 'tracker:orders_export' %}?status={{ request.GET.status|default:'all' }}&type={{ request.GET.type|default:'all' }}">
-            <i data-feather="download" class="me-1"></i>Export CSV
+      <div class="orders-header d-flex flex-column flex-sm-row align-items-start justify-content-between gap-2">
+        <h3 class="orders-header-title mb-0">Orders</h3>
+        <div class="orders-header-actions header-actions d-flex gap-2 flex-wrap w-100 justify-content-start justify-content-sm-end ms-sm-auto">
+          <a class="btn btn-outline-secondary flex-shrink-0" href="#" onclick="window.print(); return false;">
+            <i data-feather="printer" class="me-1"></i><span>Print List</span>
           </a>
-          <a class="btn btn-warning" href="{% url 'tracker:order_start' %}">
-            <i data-feather="plus-circle" class="me-1"></i>New Order
+          <a class="btn btn-light flex-shrink-0" href="{% url 'tracker:orders_export' %}?{{ request.GET.urlencode }}">
+            <i data-feather="download" class="me-1"></i><span>Export CSV</span>
+          </a>
+          <a class="btn btn-warning flex-shrink-0" href="{% url 'tracker:order_start' %}">
+            <i data-feather="plus-circle" class="me-1"></i><span>New Order</span>
           </a>
         </div>
       </div>
@@ -441,14 +449,6 @@
               with {{ request.GET.status }} status
             {% endif %}
           </small>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
-              <i data-feather="printer" class="me-1"></i>Print List
-            </button>
-            <a href="{% url 'tracker:orders_export' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-outline-primary">
-              <i data-feather="download" class="me-1"></i>Export Data
-            </a>
-          </div>
         </div>
       </div>
 

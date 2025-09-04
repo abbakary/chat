@@ -1,0 +1,428 @@
+{% extends 'tracker/base.html' %}
+{% load static %}
+{% block title %}Create Order{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/vendors/select2.css' %}">
+<link rel="stylesheet" href="{% static 'css/vendors/flatpickr/flatpickr.min.css' %}">
+<style>
+  .search-panel{background:#f8f9fa;border-radius:8px;padding:1rem;margin-bottom:1rem}
+  .result-item{padding:.5rem .75rem;border-radius:6px;cursor:pointer}
+  .result-item:hover{background:#eef5ff}
+  .customer-card{background:linear-gradient(135deg,#f8f9fa,#e9ecef);border-radius:8px;padding:1rem}
+  .customer-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+  .section-title{color:var(--bs-primary);font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+  .order-section{background:#f8f9fa;border-radius:8px;padding:1rem;margin-bottom:1rem}
+  .badge-pill{padding:.35rem .6rem;border-radius:999px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-1">Create New Order</h3>
+      <p class="text-muted mb-0">Search customer, select order type, and enter details</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'tracker:orders_list' %}" class="btn btn-outline-secondary"><i data-feather="list" class="me-1"></i>All Orders</a>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="search-panel card">
+        <div class="card-body">
+          <h6 class="section-title"><i data-feather="search" class="feather-16"></i>Select Customer</h6>
+          <div class="mb-2">
+            <input type="text" id="customerSearch" class="form-control" placeholder="Search by name, phone, email, or code..." autocomplete="off">
+          </div>
+          <div id="searchResults" class="list-group small" style="max-height:220px;overflow:auto"></div>
+          <input type="hidden" name="customer_id" id="customerId" value="{% if customer %}{{ customer.id }}{% endif %}">
+          {% if customer %}
+          <div id="selectedCustomer" class="mt-3">
+            <div class="customer-card">
+              <div class="d-flex align-items-center gap-3 mb-2">
+                <div class="customer-avatar">{{ customer.full_name|first|upper }}</div>
+                <div class="flex-grow-1">
+                  <div class="fw-semibold">{{ customer.full_name }}</div>
+                  <div class="text-muted small">{{ customer.phone }}{% if customer.email %} · {{ customer.email }}{% endif %}</div>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'tracker:customer_detail' customer.id %}"><i data-feather="user" class="feather-14 me-1"></i>View</a>
+              </div>
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                {% if customer.customer_type %}<span class="badge bg-light text-dark border">{{ customer.get_customer_type_display }}</span>{% endif %}
+                {% if customer.current_status %}<span class="badge bg-primary-subtle text-primary border">{{ customer.get_current_status_display }}</span>{% endif %}
+                <span class="badge bg-light text-dark border">Code: {{ customer.code }}</span>
+              </div>
+              <div class="row g-2 small">
+                <div class="col-6"><strong>Visits:</strong> {{ customer.total_visits }}</div>
+                <div class="col-6"><strong>Last Visit:</strong> {{ customer.last_visit|date:"Y-m-d H:i"|default:'—' }}</div>
+                {% if customer.address %}<div class="col-12"><strong>Address:</strong> {{ customer.address }}</div>{% endif %}
+                {% if customer.organization_name %}<div class="col-12"><strong>Org:</strong> {{ customer.organization_name }}{% if customer.tax_number %} · {{ customer.tax_number }}{% endif %}</div>{% endif %}
+                {% if customer.personal_subtype %}<div class="col-12"><strong>Subtype:</strong> {{ customer.get_personal_subtype_display }}</div>{% endif %}
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div id="selectedCustomer" class="mt-3 d-none"></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card d-none" id="customerExtra">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i data-feather="truck" class="feather-14 me-1"></i>Vehicles</h6>
+            <a class="btn btn-sm btn-outline-secondary" id="refreshVehicles"><i data-feather="refresh-ccw" class="feather-14"></i></a>
+          </div>
+          <div id="vehicleList" class="small text-muted">No vehicles</div>
+          <hr>
+          <div>
+            <h6 class="mb-1"><i data-feather="clock" class="feather-14 me-1"></i>Recent Orders</h6>
+            <div id="recentOrders" class="small text-muted">No recent orders</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card">
+        <form id="orderForm" method="post" action="{% url 'tracker:order_start' %}">
+          {% csrf_token %}
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="section-title m-0"><i data-feather="clipboard" class="feather-16"></i>Order Details</h6>
+              <div class="btn-group" role="group" aria-label="Order type">
+                <button type="button" class="btn btn-outline-primary btn-sm type-toggle" data-type="service"><i data-feather="tool" class="feather-14 me-1"></i>Service</button>
+                <button type="button" class="btn btn-outline-warning btn-sm type-toggle" data-type="sales"><i data-feather="shopping-cart" class="feather-14 me-1"></i>Sales</button>
+                <button type="button" class="btn btn-outline-info btn-sm type-toggle" data-type="consultation"><i data-feather="message-circle" class="feather-14 me-1"></i>Consultation</button>
+              </div>
+            </div>
+
+            <input type="hidden" name="type" value="{{ form.initial.type|default:'' }}">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Priority</label>
+                {{ form.priority }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Vehicle</label>
+                {{ form.vehicle }}
+              </div>
+            </div>
+
+            <div id="serviceBox" class="order-section mt-3" style="display:none">
+              <h6 class="mb-2"><i data-feather="tool" class="feather-16 me-1"></i>Service Details</h6>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">Services</label>
+                  <div class="row g-2">
+                    {% for cb in form.service_selection %}
+                      <div class="col-sm-6"><div class="form-check">{{ cb.tag }}<label class="form-check-label" for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></div></div>
+                    {% endfor %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Estimated Duration (minutes)</label>
+                  {{ form.estimated_duration }}
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Problem Description</label>
+                  {{ form.description }}
+                </div>
+              </div>
+
+              <div class="border rounded p-2 mt-2 bg-white">
+                <div class="small text-muted mb-2">Service Details</div>
+                <div id="svc-oil_change" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Oil Grade</label>
+                    <select class="form-select" name="svc_oil_grade">
+                      <option value="">Select</option>
+                      <option>5W-30</option>
+                      <option>5W-40</option>
+                      <option>10W-40</option>
+                      <option>15W-40</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="svc_oil_filter" id="svc_oil_filter">
+                      <label class="form-check-label" for="svc_oil_filter">Replace oil filter</label>
+                    </div>
+                  </div>
+                </div>
+                <div id="svc-engine_diagnostics" class="row g-2 svc-section" style="display:none">
+                  <div class="col-12">
+                    <label class="form-label">Observed Symptoms</label>
+                    <textarea class="form-control" rows="2" name="svc_diag_symptoms" placeholder="E.g., check-engine light, rough idle"></textarea>
+                  </div>
+                </div>
+                <div id="svc-brake_repair" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Axle</label>
+                    <select class="form-select" name="svc_brake_axle">
+                      <option value="">Select</option>
+                      <option>Front</option>
+                      <option>Rear</option>
+                      <option>Both</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Additional Notes</label>
+                    <input class="form-control" name="svc_brake_notes" placeholder="Pads, rotors, fluid, etc.">
+                  </div>
+                </div>
+                <div id="svc-wheel_alignment" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Alignment Type</label>
+                    <select class="form-select" name="svc_align_type">
+                      <option value="">Select</option>
+                      <option>Front-end</option>
+                      <option>Four-wheel</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Notes</label>
+                    <input class="form-control" name="svc_align_notes" placeholder="Pulling, uneven tire wear, etc.">
+                  </div>
+                </div>
+                <div id="svc-battery_check" class="row g-2 svc-section" style="display:none">
+                  <div class="col-md-6">
+                    <label class="form-label">Battery Age (years)</label>
+                    <input class="form-control" type="number" min="0" step="0.1" name="svc_batt_age">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Notes</label>
+                    <input class="form-control" name="svc_batt_notes" placeholder="Cranking, lights dim, etc.">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="salesBox" class="order-section mt-3" style="display:none">
+              <h6 class="mb-2"><i data-feather="shopping-cart" class="feather-16 me-1"></i>Sales Details</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Item</label>
+                  {{ form.item_name }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Brand</label>
+                  {{ form.brand }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Quantity</label>
+                  {{ form.quantity }}
+                  <div class="form-text" id="stockHint"></div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Condition</label>
+                  {{ form.tire_type }}
+                </div>
+              </div>
+            </div>
+
+            <div id="inquiryBox" class="order-section mt-3" style="display:none">
+              <h6 class="mb-2"><i data-feather="message-circle" class="feather-16 me-1"></i>Consultation Details</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Inquiry Type</label>
+                  {{ form.inquiry_type }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Contact Preference</label>
+                  {{ form.contact_preference }}
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Questions</label>
+                  {{ form.questions }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Follow-up Date</label>
+                  {{ form.follow_up_date }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer d-flex justify-content-between align-items-center">
+            <div class="text-muted small">Status: <span class="badge bg-light text-dark border">Created</span></div>
+            <div>
+              <button type="button" id="submitAjax" class="btn btn-primary"><i data-feather="check" class="me-1"></i>Create Order</button>
+              <button type="submit" class="btn btn-outline-secondary">Submit (Standard)</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/select2/select2.full.min.js' %}"></script>
+<script src="{% static 'js/flat-pickr/flatpickr.js' %}"></script>
+<script>
+(function(){
+  'use strict';
+  const $ = window.jQuery;
+  const orderForm = document.getElementById('orderForm');
+  const customerIdInput = document.getElementById('customerId');
+  const resultsBox = document.getElementById('searchResults');
+  const selectedCustomerBox = document.getElementById('selectedCustomer');
+  const vehicleList = document.getElementById('vehicleList');
+  const recentOrders = document.getElementById('recentOrders');
+  const customerExtra = document.getElementById('customerExtra');
+  const btnSubmitAjax = document.getElementById('submitAjax');
+  const vehicleSelect = orderForm.querySelector('[name="vehicle"]');
+
+  if ($ && $.fn.select2){ $('select').select2({width:'100%'}); }
+  if (window.flatpickr){ document.querySelectorAll('input[type="date"]').forEach(el=>flatpickr(el,{dateFormat:'Y-m-d',altInput:true,altFormat:'F j, Y'})); }
+
+  function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(null,a), wait); }; }
+  function getCSRF(){ const el = orderForm.querySelector('[name="csrfmiddlewaretoken"]'); return el? el.value: ''; }
+
+  function toggleBoxes(){ const t = (orderForm.querySelector('[name="type"]').value||'').toLowerCase(); document.getElementById('serviceBox').style.display = (t==='service')? '':'none'; document.getElementById('salesBox').style.display = (t==='sales')? '':'none'; document.getElementById('inquiryBox').style.display = (t==='consultation')? '':'none'; document.querySelectorAll('.type-toggle').forEach(btn=>btn.classList.toggle('active', btn.dataset.type===t)); }
+  const typeInput = orderForm.querySelector('[name="type"]');
+  if (!typeInput.value){ typeInput.value = 'service'; }
+  typeInput.addEventListener('change', toggleBoxes); toggleBoxes();
+  document.querySelectorAll('.type-toggle').forEach(btn=>{ btn.addEventListener('click', ()=>{ typeInput.value = btn.dataset.type; typeInput.dispatchEvent(new Event('change',{bubbles:true})); }); });
+
+  // Inventory integration: item-brand consistency and stock hint
+  const selItem = orderForm.querySelector('[name="item_name"]');
+  const selBrand = orderForm.querySelector('[name="brand"]');
+  const qtyInput = orderForm.querySelector('[name="quantity"]');
+  const stockHint = document.getElementById('stockHint');
+
+  async function apiGet(url){ try{ const r = await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } catch(e){ return {}; } }
+  function setOptions(select, items, placeholder){ const current = select.value; const opts = [`<option value="">${placeholder}</option>`].concat(items.map(i=>`<option value="${i.value}">${i.label}</option>`)); select.innerHTML = opts.join(''); if (items.some(i=>i.value===current)) { select.value = current; } else { select.value = ''; }
+    if (window.jQuery && jQuery.fn.select2) { jQuery(select).trigger('change.select2'); }
+  }
+  async function loadBrands(){ const name = (selItem?.value||'').trim(); if(!selBrand) return; if(!name){ setOptions(selBrand, [], 'Select brand'); updateStock(); return; }
+    const data = await apiGet(`{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}`); const brands = (data.brands||[]).map(b=>({ value: b.brand, label: b.brand+(b.quantity? ` (qty: ${b.quantity})`: '') })); setOptions(selBrand, brands, 'Select brand'); updateStock(); }
+  async function updateStock(){ if(!selItem||!selBrand||!qtyInput||!stockHint) return; const name = (selItem.value||'').trim(); const brand = (selBrand.value||'').trim(); if(!name||!brand){ stockHint.textContent=''; qtyInput.removeAttribute('max'); return; }
+    const data = await apiGet(`{% url 'tracker:api_inventory_stock' %}?name=${encodeURIComponent(name)}&brand=${encodeURIComponent(brand)}`); const available = parseInt(data.available||0,10); if(available>=0){ stockHint.textContent = `Available: ${available}`; qtyInput.max = available>0? available: null; if(available>0 && (!qtyInput.value || parseInt(qtyInput.value,10)<=0)){ qtyInput.value = 1; } }
+  }
+  selItem?.addEventListener('change', loadBrands);
+  selBrand?.addEventListener('change', updateStock);
+  qtyInput?.addEventListener('input', ()=>{ const max = parseInt(qtyInput.max||0,10); if(max && parseInt(qtyInput.value||0,10) > max){ qtyInput.value = max; } });
+  if (selItem && selItem.value){ loadBrands(); }
+
+  // Lightweight JSON fetch helper
+  async function fetchJSON(url){
+    try{ const r = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    }catch(e){ console.warn('fetchJSON error', e); return {}; }
+  }
+
+  // Service-specific UI toggle
+  const svcSections = Array.from(document.querySelectorAll('.svc-section'));
+  function updateServiceSections(){
+    const checked = Array.from(document.querySelectorAll('input[name="service_selection"]:checked')).map(i=>i.value);
+    svcSections.forEach(sec=>{ const key = sec.id.replace('svc-',''); sec.style.display = checked.includes(key)? '': 'none'; });
+  }
+  document.querySelectorAll('input[name="service_selection"]').forEach(cb=>cb.addEventListener('change', updateServiceSections));
+  updateServiceSections();
+
+  function buildServiceDetails(){
+    const parts = [];
+    const add = (label, val)=>{ if(val){ parts.push(`${label}: ${val}`); } };
+    if (document.querySelector('input[name="service_selection"][value="oil_change"]:checked')){
+      add('Oil Grade', document.querySelector('[name="svc_oil_grade"]').value);
+      add('Oil Filter', document.querySelector('[name="svc_oil_filter"]').checked? 'Replace': 'No');
+    }
+    if (document.querySelector('input[name="service_selection"][value="engine_diagnostics"]:checked')){
+      add('Symptoms', document.querySelector('[name="svc_diag_symptoms"]').value);
+    }
+    if (document.querySelector('input[name="service_selection"][value="brake_repair"]:checked')){
+      add('Brake Axle', document.querySelector('[name="svc_brake_axle"]').value);
+      add('Brake Notes', document.querySelector('[name="svc_brake_notes"]').value);
+    }
+    if (document.querySelector('input[name="service_selection"][value="wheel_alignment"]:checked')){
+      add('Alignment Type', document.querySelector('[name="svc_align_type"]').value);
+      add('Alignment Notes', document.querySelector('[name="svc_align_notes"]').value);
+    }
+    if (document.querySelector('input[name="service_selection"][value="battery_check"]:checked')){
+      add('Battery Age', document.querySelector('[name="svc_batt_age"]').value);
+      add('Battery Notes', document.querySelector('[name="svc_batt_notes"]').value);
+    }
+    return parts.length? ('\nDetails: ' + parts.join(' | ')) : '';
+  }
+
+  async function searchCustomers(q){ if(!q||q.length<2){ resultsBox.innerHTML=''; return; } const url = `{% url 'tracker:customers_search' %}?q=${encodeURIComponent(q)}`; const data = await fetchJSON(url); const items = data.results||[]; resultsBox.innerHTML = items.map(r=>`<button type="button" class="list-group-item list-group-item-action result-item" data-id="${r.id}"><div class="d-flex justify-content-between"><span class="fw-semibold">${r.name}</span><span class="text-muted small">${r.code||''}</span></div><div class="text-muted small">${r.phone||''}${r.email? ' · '+r.email:''}</div></button>`).join(''); }
+  document.getElementById('customerSearch').addEventListener('input', debounce((e)=>{ searchCustomers(e.target.value.trim()); }, 300));
+  resultsBox.addEventListener('click', async (e)=>{ const btn=e.target.closest('.result-item'); if(!btn) return; const id=btn.dataset.id; customerIdInput.value=id; resultsBox.innerHTML=''; document.getElementById('customerSearch').value=''; const details = await fetchJSON(`{% url 'tracker:customers_search' %}?details=1&customer_id=${encodeURIComponent(id)}`); const r=(details.results||[])[0]||{}; selectedCustomerBox.classList.remove('d-none'); selectedCustomerBox.innerHTML = `<div class=\"customer-card d-flex align-items-center gap-3\"><div class=\"customer-avatar\">${(r.name||'?').charAt(0).toUpperCase()}</div><div class=\"flex-grow-1\"><div class=\"fw-semibold\">${r.name||''}</div><div class=\"text-muted small\">${r.phone||''}${r.email? ' · '+r.email:''}</div></div><a class=\"btn btn-sm btn-outline-primary\" href=\"{% url 'tracker:customers_list' %}${r.id? '' : ''}\" onclick=\"event.preventDefault(); if(${!!r.id}) window.location='{% url 'tracker:customer_detail' 0 %}'.replace('/0/','/${r.id}/');\"><i data-feather='user' class='feather-14 me-1'></i>View</a></div>`;
+    customerExtra.classList.remove('d-none');
+    vehicleList.innerHTML = (r.vehicles||[]).length? r.vehicles.map(v=>`<span class='badge bg-light text-dark border me-1 mb-1 badge-pill'>${v.plate_number||''} ${v.make||''} ${v.model||''}</span>`).join(''): 'No vehicles';
+    recentOrders.innerHTML = (r.orders||[]).length? r.orders.map(o=>`<div><span class='badge bg-light text-dark border me-1'>${o.type}</span> #${o.order_number} · <span class='text-muted'>${o.status.replace('_',' ')}</span></div>`).join(''): 'No recent orders';
+    if (vehicleSelect){ const placeholder = vehicleSelect.querySelector('option[value=\"\"]')?.outerHTML || '<option value=\"\">---------</option>'; vehicleSelect.innerHTML = placeholder + ((r.vehicles||[]).map(v=>`<option value=\"${v.id}\">${v.plate_number||''} ${v.make||''} ${v.model||''}</option>`).join('')); if ($ && $.fn.select2){ $(vehicleSelect).trigger('change.select2'); } }
+    if(window.feather) feather.replace(); });
+
+  function notify(msg, type){
+    if (window.appNotify){ return window.appNotify(msg, type); }
+    if (window.jQuery && $.notify){ $.notify({message: msg},{ type: type||'info', delay: 1500, placement:{from:'top',align:'right'} }); }
+    else { alert(msg); }
+  }
+
+  btnSubmitAjax?.addEventListener('click', async ()=>{
+    const cid = customerIdInput.value; if(!cid){ notify('Please select a customer first.','warning'); return; }
+    const descEl = orderForm.querySelector('[name="description"]');
+    if (descEl){ const extra = buildServiceDetails(); if(extra && !descEl.value.includes('Details:')) descEl.value = (descEl.value||'') + '\n' + extra; }
+    const fd = new FormData(orderForm); fd.set('customer_id', cid); fd.set('type', (typeInput && typeInput.value) ? typeInput.value : 'service');
+
+    // Client-side quick validation for sales
+    const orderType = (typeInput && typeInput.value) ? typeInput.value : 'service';
+    if (orderType === 'sales'){
+      const item = (selItem && selItem.value || '').trim();
+      const brand = (selBrand && selBrand.value || '').trim();
+      const qty = parseInt((qtyInput && qtyInput.value) || '0', 10);
+      if (!item || !brand || !(qty > 0)){
+        notify('Item, brand and valid quantity are required','warning');
+        return;
+      }
+    }
+
+    try{
+      const r = await fetch(orderForm.action, {
+        method:'POST',
+        headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCSRF(), 'Accept':'application/json' },
+        credentials: 'same-origin',
+        body: fd
+      });
+      let data = null;
+      const ct = r.headers.get('content-type')||'';
+      if (ct.includes('application/json')){
+        data = await r.json();
+      } else {
+        const txt = await r.text();
+        if(!r.ok){ throw new Error(txt || ('HTTP '+r.status)); }
+        // Try to parse anyway
+        try { data = JSON.parse(txt); } catch(parseErr){ throw new Error(txt || 'Unexpected response'); }
+      }
+      if(data && data.success){
+        notify('Order created successfully','success');
+        const target = data.order_id ? '{% url 'tracker:order_detail' 0 %}'.replace('/0/','/'+data.order_id+'/') : '{% url 'tracker:orders_list' %}';
+        setTimeout(()=>{ window.location = target; }, 600);
+      } else {
+        notify(data && data.message ? data.message : 'Could not create order','danger');
+        if(data && data.code==='insufficient_stock' && typeof data.available!=='undefined'){
+          if(qtyInput){ qtyInput.max=data.available; if(parseInt(qtyInput.value||0,10) > data.available){ qtyInput.value = data.available; } }
+          if (typeof updateStock === 'function') { updateStock(); }
+        }
+      }
+    }catch(e){
+      notify((e && e.message) ? e.message : 'Request failed. Please try again.','danger');
+    }
+  });
+
+  if('{{ customer.id|default:"" }}'){ customerExtra.classList.remove('d-none'); }
+
+  orderForm.addEventListener('submit', function(){ const descEl = orderForm.querySelector('[name="description"]'); if (descEl){ const extra = buildServiceDetails(); if(extra && !descEl.value.includes('Details:')) descEl.value = (descEl.value||'') + '\n' + extra; } });
+
+  if (window.feather){ feather.replace(); }
+})();
+</script>
+{% endblock %}

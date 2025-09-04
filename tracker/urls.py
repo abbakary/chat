@@ -43,12 +43,13 @@ urlpatterns = [
 
     # User management (admin)
     path("users/", views.users_list, name="users_list"),
+    path("users/add/", views.user_create, name="user_create"),
     path("users/<int:pk>/edit/", views.user_edit, name="user_edit"),
 
-    # Admin: system settings and tools
-    path("admin/settings/", views.system_settings, name="system_settings"),
-    path("admin/audit-logs/", views.audit_logs, name="audit_logs"),
-    path("admin/backup/", views.backup_restore, name="backup_restore"),
+    # Internal admin console: system settings and tools
+    path("console/settings/", views.system_settings, name="system_settings"),
+    path("console/audit-logs/", views.audit_logs, name="audit_logs"),
+    path("console/backup/", views.backup_restore, name="backup_restore"),
 
     path("login/", views.CustomLoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),

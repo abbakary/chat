@@ -164,6 +164,9 @@
     padding: 1rem;
     margin-top: 1rem;
   }
+  .order-header .contact-actions{gap:0.25rem}
+  .order-header .contact-button{color:#fff;border-color:rgba(255,255,255,0.55);background:rgba(255,255,255,0.12)}
+  .order-header .contact-button:hover{background:rgba(255,255,255,0.2);border-color:#fff}
 </style>
 {% endblock %}
 
@@ -191,16 +194,33 @@
             </span>
           </div>
         </div>
-        <div class="d-flex gap-2">
-          <a class="btn btn-light" href="{% url 'tracker:orders_list' %}">
-            <i data-feather="arrow-left" class="me-1"></i>Back to Orders
-          </a>
-          <a class="btn btn-light" href="{% url 'tracker:customer_detail' order.customer.id %}">
-            <i data-feather="user" class="me-1"></i>View Customer
-          </a>
-          <button class="btn btn-warning" onclick="window.print()">
-            <i data-feather="printer" class="me-1"></i>Print
-          </button>
+        <div class="d-flex flex-column align-items-end gap-2">
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <a class="btn btn-light" href="{% url 'tracker:orders_list' %}">
+              <i data-feather="arrow-left" class="me-1"></i>Back to Orders
+            </a>
+            <a class="btn btn-light" href="{% url 'tracker:customer_detail' order.customer.id %}">
+              <i data-feather="user" class="me-1"></i>View Customer
+            </a>
+            <button class="btn btn-warning" onclick="window.print()">
+              <i data-feather="printer" class="me-1"></i>Print
+            </button>
+          </div>
+          <div class="contact-actions d-flex flex-wrap justify-content-end">
+            {% if order.customer.phone %}
+            <a href="tel:{{ order.customer.phone }}" class="btn btn-outline-light contact-button" title="Call" aria-label="Call {{ order.customer.full_name }}">
+              <i data-feather="phone"></i>
+            </a>
+            {% endif %}
+            {% if order.customer.email %}
+            <a href="mailto:{{ order.customer.email }}" class="btn btn-outline-light contact-button" title="Email" aria-label="Email {{ order.customer.full_name }}">
+              <i data-feather="mail"></i>
+            </a>
+            {% endif %}
+            <button type="button" class="btn btn-outline-light contact-button share-btn" title="Share" aria-label="Share order">
+              <i data-feather="share-2"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -656,6 +676,23 @@
   window.addEventListener('afterprint', function() {
     document.title = 'Order {{ order.order_number }} - Details';
   });
+
+  // Share functionality
+  const shareBtn = document.querySelector('.share-btn');
+  if (shareBtn) {
+    const shareText = `Order #{{ order.order_number }}\nCustomer: {{ order.customer.full_name }}\nPhone: {{ order.customer.phone }}{% if order.customer.email %}\nEmail: {{ order.customer.email }}{% endif %}`;
+    shareBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Order {{ order.order_number }}', text: shareText }); } catch(_){}
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+        alert('Order info copied to clipboard!');
+      } else {
+        prompt('Order info:', shareText);
+      }
+    });
+  }
 
   // Initialize feather icons
   if (window.feather) {

@@ -10,37 +10,111 @@
   <link rel="stylesheet" href="{% static 'css/vendors/feather-icon.css' %}">
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
   <link rel="stylesheet" href="{% static 'css/color-1.css' %}">
+  <style>
+    .login-layout { min-height: 100vh; background: radial-gradient(1200px 600px at 80% -20%, rgba(255, 235, 59, .08), transparent 60%), linear-gradient(135deg, #0b1730 0%, #0f1f46 50%, #11214d 100%); }
+    .login-card-wrap { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+    @media (max-width: 992px){ .login-card-wrap { grid-template-columns: 1fr; } }
+
+    /* Left visual section */
+    .login-visual { position: relative; overflow: hidden; color: #fff; padding: 3rem; display: flex; align-items: center; justify-content: center; }
+    .login-visual-inner { position: relative; width: 100%; max-width: 720px; text-align: center; }
+    .brand-badge { font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #ffeb3b; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
+    .dynamic-words { position: relative; height: 3rem; margin-top: .5rem; }
+    .dynamic-words span { position: absolute; left: 0; right: 0; opacity: 0; transform: translateY(10px); color: #ffeb3b; font-weight: 700; font-size: 1.25rem; text-shadow: 0 2px 8px rgba(0,0,0,.4); animation: swapText 8s infinite; }
+    .dynamic-words .word-2 { animation-delay: 4s; }
+    @keyframes swapText { 0%{opacity:0;transform:translateY(10px);} 5%,45%{opacity:1;transform:translateY(0);} 55%,100%{opacity:0;transform:translateY(-10px);} }
+
+    /* Tyre animation */
+    .tyre-wrap { position: relative; height: 240px; margin: 2rem auto 0; }
+    .tyre-mover { position: absolute; top: 0; left: 0; right: 0; animation: drive 10s linear infinite; }
+    .tyre-img { height: 240px; width: auto; filter: drop-shadow(0 12px 24px rgba(0,0,0,.5)); animation: spin 1.2s linear infinite; }
+    @keyframes drive { 0%{ transform: translateX(-120%); } 100%{ transform: translateX(120%); } }
+    @keyframes spin { from{ transform: rotate(0deg);} to{ transform: rotate(360deg);} }
+
+    /* Floating particles */
+    .particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .particles span { position: absolute; display: block; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.35); box-shadow: 0 0 6px rgba(255,255,255,.6); animation: floatUp linear infinite; }
+    @keyframes floatUp { from { transform: translateY(20vh); opacity:.0; } 10%{opacity:.7;} to { transform: translateY(-110vh); opacity: 0; } }
+    /* create many particles with different positions/durations */
+    .particles span:nth-child(1){ left:5%; animation-duration:9s; }
+    .particles span:nth-child(2){ left:12%; animation-duration:12s; }
+    .particles span:nth-child(3){ left:20%; animation-duration:7s; }
+    .particles span:nth-child(4){ left:28%; animation-duration:10s; }
+    .particles span:nth-child(5){ left:36%; animation-duration:8s; }
+    .particles span:nth-child(6){ left:44%; animation-duration:13s; }
+    .particles span:nth-child(7){ left:52%; animation-duration:9s; }
+    .particles span:nth-child(8){ left:60%; animation-duration:11s; }
+    .particles span:nth-child(9){ left:68%; animation-duration:7.5s; }
+    .particles span:nth-child(10){ left:76%; animation-duration:10.5s; }
+    .particles span:nth-child(11){ left:84%; animation-duration:12.5s; }
+    .particles span:nth-child(12){ left:92%; animation-duration:8.5s; }
+
+    /* Wave effect at bottom of left panel */
+    .wave { position: absolute; left: 0; right: 0; bottom: -1px; height: 120px; }
+    .wave svg { width: 200%; height: 100%; animation: waveMove 12s linear infinite; }
+    @keyframes waveMove { from{ transform: translateX(0); } to{ transform: translateX(-50%); } }
+
+    /* Right form section */
+    .login-form-side { background: #fff; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+    .form-card { width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 10px 30px rgba(13, 27, 62, .15); border: 1px solid #e9ecef; }
+    .form-card .card-body { padding: 2rem; }
+    .form-title { font-weight: 700; }
+    .btn-login { background: linear-gradient(135deg, #ffb300 0%, #ffc107 100%); border: 0; color: #1f1f1f; font-weight: 700; }
+    .btn-login:hover { filter: brightness(0.95); }
+    .form-floating-label { font-weight: 600; }
+  </style>
 </head>
-<body class="bg-light d-flex align-items-center min-vh-100">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-sm-10 col-md-6 col-lg-4">
-        <div class="card shadow-sm">
-          <div class="card-body p-4">
-            <h4 class="mb-3 text-center">Sign in</h4>
-            {% if form.errors %}
-              <div class="alert alert-danger">Invalid username or password</div>
-            {% endif %}
-            <form method="post" novalidate>
-              {% csrf_token %}
-              <div class="mb-3">
-                <label class="form-label">Username</label>
-                {{ form.username|add_class:'form-control' }}
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Password</label>
-                {{ form.password|add_class:'form-control' }}
-              </div>
-              <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" name="remember" id="remember">
-                <label class="form-check-label" for="remember">Keep me signed in</label>
-              </div>
-              <button type="submit" class="btn btn-primary w-100">Login</button>
-            </form>
+<body class="login-layout">
+  <div class="login-card-wrap">
+    <!-- Left: Visuals -->
+    <section class="login-visual">
+      <div class="particles">{% for _ in 'abcdefghijklmnop' %}<span></span>{% endfor %}</div>
+      <div class="login-visual-inner">
+        <div class="brand-badge h5 mb-2">Superdoll</div>
+        <div class="dynamic-words">
+          <span class="word-1">Welcome to home of automobile</span>
+          <span class="word-2">Superdoll</span>
+        </div>
+        <div class="tyre-wrap">
+          <div class="tyre-mover">
+            <img class="tyre-img" src="https://cdn.builder.io/api/v1/image/assets%2F01822e59c2f24bdb866eced0eaa42d47%2Fa3173fa341404f049229e35c2422b511?format=webp&width=800" alt="Tyre moving">
           </div>
         </div>
       </div>
-    </div>
+      <div class="wave">
+        <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
+          <path d="M0,0 C300,100 900,0 1200,100 L1200,120 L0,120 Z" fill="rgba(255,255,255,.12)"></path>
+        </svg>
+      </div>
+    </section>
+
+    <!-- Right: Form -->
+    <section class="login-form-side">
+      <div class="card form-card">
+        <div class="card-body">
+          <h3 class="form-title mb-3 text-center">Sign in</h3>
+          {% if form.errors %}
+            <div class="alert alert-danger">Invalid username or password</div>
+          {% endif %}
+          <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-floating-label form-label">Username</label>
+              {{ form.username|add_class:'form-control' }}
+            </div>
+            <div class="mb-3">
+              <label class="form-floating-label form-label">Password</label>
+              {{ form.password|add_class:'form-control' }}
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" name="remember" id="remember">
+              <label class="form-check-label" for="remember">Keep me signed in</label>
+            </div>
+            <button type="submit" class="btn btn-login w-100 py-2">Login</button>
+          </form>
+        </div>
+      </div>
+    </section>
   </div>
   <script src="{% static 'js/bootstrap/bootstrap.bundle.min.js' %}"></script>
 </body>

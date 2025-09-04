@@ -84,6 +84,7 @@
                 <ul class="sidebar-submenu">
                   <li><a href="{% url 'tracker:customers_list' %}">All Customers</a></li>
                   <li><a href="{% url 'tracker:customer_register' %}">Register Customer</a></li>
+                  <li><a href="{% url 'tracker:customers_export' %}">Export Customers</a></li>
                   {% if request.user.is_superuser %}
                   <li><a href="{% url 'tracker:organization' %}">Organizations</a></li>
                   {% endif %}
@@ -96,6 +97,7 @@
                   <li><a href="{% url 'tracker:orders_list' %}">All Orders</a></li>
                   <li><a href="{% url 'tracker:order_start' %}">New Order</a></li>
                   <li><a href="{% url 'tracker:inquiries' %}">Inquiries</a></li>
+                  <li><a href="{% url 'tracker:orders_export' %}">Export Orders</a></li>
                 </ul>
               </li>
 
@@ -129,6 +131,9 @@
                 <a class="sidebar-link sidebar-title" href="#"><span>Admin</span></a>
                 <ul class="sidebar-submenu">
                   <li><a href="{% url 'tracker:users_list' %}">Users</a></li>
+                  <li><a href="{% url 'tracker:system_settings' %}">System Settings</a></li>
+                  <li><a href="{% url 'tracker:audit_logs' %}">Audit Logs</a></li>
+                  <li><a href="{% url 'tracker:backup_restore' %}">Backup &amp; Restore</a></li>
                 </ul>
               </li>
               {% endif %}
@@ -147,6 +152,7 @@
             {% endfor %}
           </div>
         {% endif %}
+        <div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 1080"></div>
         {% block content %}{% endblock %}
       </div>
       <!-- Page Body Ends -->
@@ -182,43 +188,93 @@
 
   <script>
     (function(){
-      if (window.feather) feather.replace();
-      // Fallback: ensure sidebar submenu toggles
-      document.addEventListener('click', function(e){
-        const t = e.target.closest('.sidebar-link.sidebar-title');
-        if (t && t.getAttribute('href') === '#'){
-          e.preventDefault();
-          const sub = t.nextElementSibling;
-          if (sub && sub.classList.contains('sidebar-submenu')){
-            sub.style.display = (sub.style.display === 'block') ? 'none' : 'block';
-            t.classList.toggle('active');
+      const init = function(){
+        if (window.feather) feather.replace();
+        // Global toast helper
+        window.appNotify = function(msg, level){
+          try{
+            const host = document.getElementById('toastContainer');
+            if (!host || !window.bootstrap){ alert(msg); return; }
+            const lvl = (level||'info').toLowerCase();
+            const cls = lvl.includes('success')?'success':lvl.includes('error')||lvl.includes('danger')?'danger':lvl.includes('warning')?'warning':lvl.includes('info')?'info':'secondary';
+            const el = document.createElement('div');
+            el.className = 'toast align-items-center text-bg-'+cls+' border-0';
+            el.role = 'alert'; el.ariaLive='assertive'; el.ariaAtomic='true';
+            el.innerHTML = '<div class="d-flex"><div class="toast-body">'+ String(msg) +'</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+            host.appendChild(el);
+            new bootstrap.Toast(el, { delay: 2500 }).show();
+          }catch(_){ alert(msg); }
+        };
+        // Fallback: ensure sidebar submenu toggles
+        document.addEventListener('click', function(e){
+          const t = e.target.closest('.sidebar-link.sidebar-title');
+          if (t && t.getAttribute('href') === '#'){
+            e.preventDefault();
+            const sub = t.nextElementSibling;
+            if (sub && sub.classList.contains('sidebar-submenu')){
+              sub.style.display = (sub.style.display === 'block') ? 'none' : 'block';
+              t.classList.toggle('active');
+            }
+          }
+        });
+        // Mark active link based on current path
+        const path = location.pathname;
+        document.querySelectorAll('#sidebar-menu a[href]')?.forEach(a=>{
+          try{
+            if (a.pathname === path){ a.classList.add('active'); const sub=a.closest('.sidebar-submenu'); if(sub){ sub.style.display='block'; sub.previousElementSibling?.classList.add('active'); } }
+          }catch(_){ }
+        });
+        // Show feedback modal/toasts from Django messages
+        const wrap = document.getElementById('dj-messages');
+        const toastsHost = document.getElementById('toastContainer');
+        if (wrap){
+          const msgs = Array.from(wrap.querySelectorAll('.dj-message'));
+          if (msgs.length){
+            const first = msgs[0];
+            const level = (first.dataset.level || '').toLowerCase();
+            const title = level.includes('success') ? 'Success' : level.includes('error') ? 'Error' : level.includes('warning') ? 'Warning' : 'Notice';
+            try{
+              const modalEl = document.getElementById('feedbackModal');
+              const iconSuccess = modalEl.querySelector('.feedback-icon.success');
+              const iconError = modalEl.querySelector('.feedback-icon.error');
+              iconSuccess.classList.toggle('d-none', !(level.includes('success') || level.includes('info')));
+              iconError.classList.toggle('d-none', !(level.includes('error') || level.includes('danger') || level.includes('warning')));
+              document.getElementById('feedbackTitle').textContent = title;
+              document.getElementById('feedbackText').textContent = first.textContent.trim();
+              const modal = new bootstrap.Modal(modalEl, {backdrop: 'static'});
+              modal.show();
+            }catch(err){
+              // Fallback to toast if modal fails
+              if (toastsHost && window.bootstrap){
+                const toastEl = document.createElement('div');
+                toastEl.className = 'toast align-items-center text-bg-' + (level.includes('success')?'success':level.includes('error')||level.includes('danger')?'danger':level.includes('warning')?'warning':'secondary') + ' border-0';
+                toastEl.role = 'alert'; toastEl.ariaLive = 'assertive'; toastEl.ariaAtomic = 'true';
+                toastEl.innerHTML = '<div class="d-flex"><div class="toast-body">'+ first.textContent.trim() +'</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+                toastsHost.appendChild(toastEl);
+                new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+              } else {
+                alert(first.textContent.trim());
+              }
+            }
+            // Additional messages as toasts
+            if (toastsHost && window.bootstrap && msgs.length > 1){
+              msgs.slice(1).forEach(m=>{
+                const lvl = (m.dataset.level||'').toLowerCase();
+                const toastEl = document.createElement('div');
+                toastEl.className = 'toast align-items-center text-bg-' + (lvl.includes('success')?'success':lvl.includes('error')||lvl.includes('danger')?'danger':lvl.includes('warning')?'warning':'secondary') + ' border-0 mt-2';
+                toastEl.role = 'alert'; toastEl.ariaLive = 'assertive'; toastEl.ariaAtomic = 'true';
+                toastEl.innerHTML = '<div class="d-flex"><div class="toast-body">'+ m.textContent.trim() +'</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+                toastsHost.appendChild(toastEl);
+                new bootstrap.Toast(toastEl, { delay: 3500 }).show();
+              });
+            }
           }
         }
-      });
-      // Mark active link based on current path
-      const path = location.pathname;
-      document.querySelectorAll('#sidebar-menu a[href]')?.forEach(a=>{
-        try{
-          if (a.pathname === path){ a.classList.add('active'); const sub=a.closest('.sidebar-submenu'); if(sub){ sub.style.display='block'; sub.previousElementSibling?.classList.add('active'); } }
-        }catch(_){ }
-      });
-      // Show feedback modal from Django messages
-      const wrap = document.getElementById('dj-messages');
-      if (wrap){
-        const first = wrap.querySelector('.dj-message');
-        if (first){
-          const level = (first.dataset.level || '').toLowerCase();
-          const title = level === 'success' ? 'Success' : level === 'error' ? 'Error' : 'Notice';
-          const modalEl = document.getElementById('feedbackModal');
-          const iconSuccess = modalEl.querySelector('.feedback-icon.success');
-          const iconError = modalEl.querySelector('.feedback-icon.error');
-          iconSuccess.classList.toggle('d-none', !(level === 'success' || level === 'info'));
-          iconError.classList.toggle('d-none', !(level === 'error' || level === 'danger' || level === 'warning'));
-          document.getElementById('feedbackTitle').textContent = title;
-          document.getElementById('feedbackText').textContent = first.textContent.trim();
-          const modal = new bootstrap.Modal(modalEl, {backdrop: 'static'});
-          modal.show();
-        }
+      };
+      if (document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', init, { once: true });
+      } else {
+        init();
       }
     })();
   </script>

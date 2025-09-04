@@ -196,6 +196,16 @@ class CustomerStep4Form(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            choices = list(self.fields['customer_type'].choices)
+        except Exception:
+            choices = []
+        if choices and (not choices[0] or choices[0][0] != ''):
+            self.fields['customer_type'].choices = [('', 'Select customer type')] + choices
+        self.fields['customer_type'].initial = ''
+
     def clean(self):
         cleaned = super().clean()
         customer_type = cleaned.get('customer_type')
@@ -308,11 +318,15 @@ class OrderForm(forms.ModelForm):
         self.fields["item_name"].widget = forms.Select(attrs={'class': 'form-select'}, choices=name_choices)
 
         try:
+            from django.db.models import Q
             brands = list(InventoryItem.objects.exclude(brand__isnull=True).exclude(brand='').values_list('brand', flat=True).order_by('brand').distinct())
+            has_unbranded = InventoryItem.objects.filter(Q(brand__isnull=True) | Q(brand='')).exists()
             brand_choices = [('', 'Select brand')] + [(b, b) for b in brands if b]
+            if has_unbranded:
+                brand_choices.append(('Unbranded','Unbranded'))
         except Exception:
             brand_choices = [('', 'Select brand')]
-        self.fields["brand"].widget = forms.Select(attrs={'class': 'form-select'}, choices=brand_choices)
+        self.fields['brand'].widget = forms.Select(attrs={'class': 'form-select'}, choices=brand_choices)
         
         # Tire type choices
         self.fields["tire_type"].widget = forms.Select(
@@ -424,20 +438,21 @@ class InventoryItemForm(forms.ModelForm):
 
 class AdminUserForm(forms.ModelForm):
     group_manager = forms.BooleanField(
-        required=False, 
+        required=False,
         label="Manager role",
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "email", "is_active", "is_staff"]
+        fields = ["first_name", "last_name", "email", "is_active", "is_staff", "is_superuser"]
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_staff': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -456,6 +471,46 @@ class AdminUserForm(forms.ModelForm):
                 user.groups.remove(mgr)
             if commit:
                 user.save()
+        return user
+
+class AdminUserCreateForm(forms.ModelForm):
+    password1 = forms.CharField(label="Password", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    password2 = forms.CharField(label="Confirm Password", widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    group_manager = forms.BooleanField(
+        required=False,
+        label="Manager role",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
+    class Meta:
+        model = User
+        fields = ["username", "first_name", "last_name", "email", "is_active", "is_staff", "is_superuser"]
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input', 'checked': True}),
+            'is_staff': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_superuser': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get('password1')
+        p2 = cleaned.get('password2')
+        if p1 and p2 and p1 != p2:
+            self.add_error('password2', 'Passwords do not match')
+        return cleaned
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data['password1'])
+        if commit:
+            user.save()
+        mgr, _ = Group.objects.get_or_create(name="manager")
+        if self.cleaned_data.get('group_manager'):
+            user.groups.add(mgr)
         return user
 
 class SystemSettingsForm(forms.Form):

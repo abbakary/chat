@@ -56,6 +56,29 @@ def send_sms(phone: str, message: str) -> tuple[bool, str]:
 
 
 from django.core.cache import cache
+from django.utils import timezone
+
+def add_audit_log(user, action: str, details: str | None = None) -> None:
+    try:
+        logs = cache.get('audit_logs', []) or []
+        entry = {
+            'time': timezone.localtime().strftime('%Y-%m-%d %H:%M:%S'),
+            'user': getattr(user, 'username', str(user) if user else 'system'),
+            'action': action,
+            'details': details or ''
+        }
+        logs.append(entry)
+        logs = logs[-500:]
+        cache.set('audit_logs', logs, None)
+    except Exception:
+        pass
+
+def get_audit_logs() -> list:
+    logs = cache.get('audit_logs', []) or []
+    return list(reversed(logs))
+
+def clear_audit_logs() -> None:
+    cache.delete('audit_logs')
 
 def clear_inventory_cache(name: str | None = None, brand: str | None = None) -> None:
     try:
