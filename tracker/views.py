@@ -471,11 +471,15 @@ def order_start(request: HttpRequest):
                 qty = 0
             if not name or not brand or qty <= 0:
                 return JsonResponse({'success': False, 'message': 'Item, brand and valid quantity are required', 'code': 'invalid'})
-            item = InventoryItem.objects.filter(name=name, brand=brand).first()
-            if not item:
+            from django.db.models import Q, Sum
+            if (brand or '').lower() == 'unbranded':
+                available = InventoryItem.objects.filter(name=name).filter(Q(brand__isnull=True) | Q(brand="")).aggregate(total=Sum('quantity')).get('total') or 0
+            else:
+                available = InventoryItem.objects.filter(name=name, brand=brand).aggregate(total=Sum('quantity')).get('total') or 0
+            if available <= 0:
                 return JsonResponse({'success': False, 'message': 'Item not found in inventory', 'code': 'not_found'})
-            if item.quantity < qty:
-                return JsonResponse({'success': False, 'message': f'Only {item.quantity} in stock for {name} ({brand})', 'code': 'insufficient_stock', 'available': item.quantity})
+            if available < qty:
+                return JsonResponse({'success': False, 'message': f'Only {available} in stock for {name} ({brand})', 'code': 'insufficient_stock', 'available': available})
         order = Order.objects.create(**order_data)
         remaining = None
         if order.type == 'sales':
