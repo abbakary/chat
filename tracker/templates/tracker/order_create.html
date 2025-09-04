@@ -362,6 +362,7 @@
     if(window.feather) feather.replace(); });
 
   function notify(msg, type){
+    if (window.appNotify){ return window.appNotify(msg, type); }
     if (window.jQuery && $.notify){ $.notify({message: msg},{ type: type||'info', delay: 1500, placement:{from:'top',align:'right'} }); }
     else { alert(msg); }
   }
