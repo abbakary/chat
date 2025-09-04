@@ -1450,8 +1450,14 @@ def system_settings(request: HttpRequest):
     if request.method == 'POST':
         form = SystemSettingsForm(request.POST)
         if form.is_valid():
-            data = {**defaults(), **form.cleaned_data}
-            cache.set('system_settings', data, None)
+            new_data = {**defaults(), **form.cleaned_data}
+            changes = []
+            for k, old_val in (data or {}).items():
+                new_val = new_data.get(k)
+                if new_val != old_val:
+                    changes.append(f"{k}: '{old_val}' -> '{new_val}'")
+            cache.set('system_settings', new_data, None)
+            add_audit_log(request.user, 'system_settings_update', '; '.join(changes) if changes else 'No changes')
             messages.success(request, 'Settings updated')
             return redirect('tracker:system_settings')
         else:
