@@ -21,6 +21,7 @@ from .forms import (
     VehicleForm,
     OrderForm,
     CustomerEditForm,
+    SystemSettingsForm,
 )
 
 
