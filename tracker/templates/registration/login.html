@@ -26,10 +26,9 @@
 
     /* Tyre animation */
     .tyre-wrap { position: relative; height: 240px; margin: 2rem auto 0; }
-    .tyre-img { position: absolute; top: 0; height: 240px; width: auto; filter: drop-shadow(0 12px 24px rgba(0,0,0,.5)); animation: drive 10s linear infinite; }
-    .tyre-img::after { content: ""; position: absolute; inset: 0; border-radius: 50%; animation: roll 1s linear infinite; }
+    .tyre-img { position: absolute; top: 0; height: 240px; width: auto; filter: drop-shadow(0 12px 24px rgba(0,0,0,.5)); animation: drive 10s linear infinite, spin 1.2s linear infinite; }
     @keyframes drive { 0%{ transform: translateX(-120%); } 100%{ transform: translateX(120%); } }
-    @keyframes roll { from{ transform: rotate(0deg);} to{ transform: rotate(360deg);} }
+    @keyframes spin { from{ transform: translateX(-120%) rotate(0deg);} to{ transform: translateX(120%) rotate(360deg);} }
 
     /* Floating particles */
     .particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
