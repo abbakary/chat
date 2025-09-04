@@ -389,7 +389,8 @@ def create_order_for_customer(request: HttpRequest, pk: int):
             o.save()
             # Deduct inventory after save
             if o.type == 'sales':
-                ok, _, remaining = adjust_inventory(o.item_name, o.brand, -(o.quantity or 0))
+                qty_int = int(o.quantity or 0)
+                ok, _, remaining = adjust_inventory(o.item_name, o.brand, -qty_int)
                 if ok:
                     messages.success(request, f"Order created. Remaining stock for {o.item_name} ({o.brand}): {remaining}")
                 else:
