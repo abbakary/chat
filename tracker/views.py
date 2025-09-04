@@ -36,6 +36,13 @@ class CustomLoginView(LoginView):
             self.request.session.set_expiry(0)
         else:
             self.request.session.set_expiry(60 * 60 * 24 * 14)
+        try:
+            from .signals import _client_ip  # reuse helper
+            ip = _client_ip(self.request)
+            ua = (self.request.META.get('HTTP_USER_AGENT') or '')[:200]
+            add_audit_log(self.request.user, 'login', f'Login at {timezone.localtime().strftime("%Y-%m-%d %H:%M:%S")} from {ip or "?"} UA: {ua}')
+        except Exception:
+            pass
         return response
 
     def get_success_url(self):
