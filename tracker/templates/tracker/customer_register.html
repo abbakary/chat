@@ -516,6 +516,13 @@
     selItem?.addEventListener('change', loadBrands);
     selBrand?.addEventListener('change', updateStock);
     qtyInput?.addEventListener('input', ()=>{ const max = parseInt(qtyInput.max||0,10); if(max && parseInt(qtyInput.value||0,10) > max){ qtyInput.value = max; } });
+
+    // Enable search and free typing
+    if (window.jQuery && jQuery.fn.select2){
+      if (selItem){ try{ jQuery(selItem).select2('destroy'); }catch(e){} jQuery(selItem).select2({ width:'100%', placeholder:'Select item', allowClear:true, tags:true, selectOnClose:true }); }
+      if (selBrand){ try{ jQuery(selBrand).select2('destroy'); }catch(e){} jQuery(selBrand).select2({ width:'100%', placeholder:'Select brand', allowClear:true, tags:true, selectOnClose:true }); }
+    }
+
     if (selItem && selItem.value){ loadBrands(); }
   })();
 
