@@ -1469,7 +1469,12 @@ def system_settings(request: HttpRequest):
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def audit_logs(request: HttpRequest):
-    logs = cache.get('audit_logs', [])
+    if request.method == 'POST' and request.POST.get('action') == 'clear':
+        clear_audit_logs()
+        add_audit_log(request.user, 'audit_logs_cleared', 'Cleared all audit logs')
+        messages.success(request, 'Audit logs cleared')
+        return redirect('tracker:audit_logs')
+    logs = get_audit_logs()
     return render(request, 'tracker/audit_logs.html', {'logs': logs})
 
 @login_required
