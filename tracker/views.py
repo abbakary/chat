@@ -166,14 +166,39 @@ def dashboard(request: HttpRequest):
 @login_required
 @login_required
 def customers_list(request: HttpRequest):
+    from django.db.models import Q
     q = request.GET.get('q','').strip()
+    f_type = request.GET.get('type','').strip()
+    f_status = request.GET.get('status','').strip()
+
     qs = Customer.objects.all().order_by('-registration_date')
     if q:
-        qs = qs.filter(full_name__icontains=q)
+        qs = qs.filter(
+            Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(email__icontains=q) | Q(code__icontains=q)
+        )
+    if f_type:
+        qs = qs.filter(customer_type=f_type)
+    if f_status == 'active':
+        qs = qs.filter(total_visits__gt=0)
+    elif f_status == 'inactive':
+        qs = qs.filter(total_visits__lte=0)
+
+    # Stats
+    today = timezone.localdate()
+    active_customers = Customer.objects.filter(arrival_time__date=today).count()
+    new_customers_today = Customer.objects.filter(registration_date__date=today).count()
+    returning_customers = Customer.objects.filter(total_visits__gt=1).count()
+
     paginator = Paginator(qs, 20)
     page = request.GET.get('page')
     customers = paginator.get_page(page)
-    return render(request, "tracker/customers_list.html", {"customers": customers, "q": q})
+    return render(request, "tracker/customers_list.html", {
+        "customers": customers,
+        "q": q,
+        "active_customers": active_customers,
+        "new_customers_today": new_customers_today,
+        "returning_customers": returning_customers,
+    })
 
 
 @login_required
@@ -409,17 +434,54 @@ def create_order_for_customer(request: HttpRequest, pk: int):
 
 @login_required
 def orders_list(request: HttpRequest):
+    from django.db.models import Q, Sum
     status = request.GET.get("status", "all")
     type_ = request.GET.get("type", "all")
+    priority = request.GET.get("priority", "")
+    date_range = request.GET.get("date_range", "")
+    customer_id = request.GET.get("customer", "")
+
     qs = Order.objects.select_related("customer", "vehicle").order_by("-created_at")
-    if status != "all":
+    if status != "all" and status:
         qs = qs.filter(status=status)
-    if type_ != "all":
+    if type_ != "all" and type_:
         qs = qs.filter(type=type_)
+    if priority:
+        qs = qs.filter(priority=priority)
+    if customer_id:
+        qs = qs.filter(customer_id=customer_id)
+    if date_range == 'today':
+        qs = qs.filter(created_at__date=timezone.localdate())
+    elif date_range == 'week':
+        start = timezone.localdate() - timezone.timedelta(days=6)
+        qs = qs.filter(created_at__date__gte=start)
+    elif date_range == 'month':
+        start = timezone.localdate().replace(day=1)
+        qs = qs.filter(created_at__date__gte=start)
+
+    # Stats (global snapshot)
+    today = timezone.localdate()
+    total_orders = Order.objects.count()
+    pending_orders = Order.objects.filter(status__in=['created','assigned']).count()
+    active_orders = Order.objects.filter(status__in=['in_progress']).count()
+    completed_today = Order.objects.filter(status='completed', completed_at__date=today).count()
+    urgent_orders = Order.objects.filter(priority='urgent').exclude(status='completed').count()
+    revenue_today = 0
+
     paginator = Paginator(qs, 20)
     page = request.GET.get('page')
     orders = paginator.get_page(page)
-    return render(request, "tracker/orders_list.html", {"orders": orders, "status": status, "type": type_})
+    return render(request, "tracker/orders_list.html", {
+        "orders": orders,
+        "status": status,
+        "type": type_,
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "active_orders": active_orders,
+        "completed_today": completed_today,
+        "urgent_orders": urgent_orders,
+        "revenue_today": revenue_today,
+    })
 
 
 @login_required
