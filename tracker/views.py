@@ -1006,6 +1006,10 @@ def inventory_delete(request: HttpRequest, pk: int):
         name, brand = item.name, item.brand
         item.delete()
         clear_inventory_cache(name, brand)
+        try:
+            add_audit_log(request.user, 'inventory_delete', f"Deleted item '{name}' ({brand or 'Unbranded'})")
+        except Exception:
+            pass
         messages.success(request, 'Inventory item deleted')
         return redirect('tracker:inventory_list')
     return render(request, 'tracker/inventory_delete.html', { 'item': item })
