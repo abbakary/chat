@@ -370,7 +370,7 @@
       const r = await fetch(orderForm.action, { method:'POST', headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCSRF() }, body: fd });
       const data = await r.json();
       if(data.success){ window.location = '{% url 'tracker:order_detail' 0 %}'.replace('/0/','/'+data.order_id+'/'); }
-      else { alert(data.message||'Could not create order'); if(data.code==='insufficient_stock' && typeof data.available!=='undefined'){ if(odQty){ odQty.max=data.available; odQty.value=data.available; } checkStock(); } }
+      else { alert(data.message||'Could not create order'); if(data.code==='insufficient_stock' && typeof data.available!=='undefined'){ if(qtyInput){ qtyInput.max=data.available; if(parseInt(qtyInput.value||0,10) > data.available){ qtyInput.value = data.available; } } if (typeof updateStock === 'function') { updateStock(); } } }
     }catch(e){ alert('Network error. Please try again.'); }
   });
 
