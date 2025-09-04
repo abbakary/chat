@@ -190,6 +190,21 @@
     (function(){
       const init = function(){
         if (window.feather) feather.replace();
+        // Global toast helper
+        window.appNotify = function(msg, level){
+          try{
+            const host = document.getElementById('toastContainer');
+            if (!host || !window.bootstrap){ alert(msg); return; }
+            const lvl = (level||'info').toLowerCase();
+            const cls = lvl.includes('success')?'success':lvl.includes('error')||lvl.includes('danger')?'danger':lvl.includes('warning')?'warning':lvl.includes('info')?'info':'secondary';
+            const el = document.createElement('div');
+            el.className = 'toast align-items-center text-bg-'+cls+' border-0';
+            el.role = 'alert'; el.ariaLive='assertive'; el.ariaAtomic='true';
+            el.innerHTML = '<div class="d-flex"><div class="toast-body">'+ String(msg) +'</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+            host.appendChild(el);
+            new bootstrap.Toast(el, { delay: 2500 }).show();
+          }catch(_){ alert(msg); }
+        };
         // Fallback: ensure sidebar submenu toggles
         document.addEventListener('click', function(e){
           const t = e.target.closest('.sidebar-link.sidebar-title');
