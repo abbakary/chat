@@ -100,16 +100,13 @@
               </div>
             </div>
 
+            <input type="hidden" name="type" value="{{ form.initial.type|default:'' }}">
             <div class="row g-3">
-              <div class="col-md-4">
-                <label class="form-label">Order Type</label>
-                {{ form.type }}
-              </div>
-              <div class="col-md-4">
+              <div class="col-md-6">
                 <label class="form-label">Priority</label>
                 {{ form.priority }}
               </div>
-              <div class="col-md-4">
+              <div class="col-md-6">
                 <label class="form-label">Vehicle</label>
                 {{ form.vehicle }}
               </div>
@@ -218,6 +215,7 @@
                 <div class="col-md-6">
                   <label class="form-label">Quantity</label>
                   {{ form.quantity }}
+                  <div class="form-text" id="stockHint"></div>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Condition</label>
@@ -287,10 +285,30 @@
   function getCSRF(){ const el = orderForm.querySelector('[name="csrfmiddlewaretoken"]'); return el? el.value: ''; }
 
   function toggleBoxes(){ const t = (orderForm.querySelector('[name="type"]').value||'').toLowerCase(); document.getElementById('serviceBox').style.display = (t==='service')? '':'none'; document.getElementById('salesBox').style.display = (t==='sales')? '':'none'; document.getElementById('inquiryBox').style.display = (t==='consultation')? '':'none'; document.querySelectorAll('.type-toggle').forEach(btn=>btn.classList.toggle('active', btn.dataset.type===t)); }
-  orderForm.querySelector('[name="type"]').addEventListener('change', toggleBoxes); toggleBoxes();
-  document.querySelectorAll('.type-toggle').forEach(btn=>{ btn.addEventListener('click', ()=>{ const sel = orderForm.querySelector('[name="type"]'); sel.value = btn.dataset.type; if (window.jQuery && jQuery.fn.select2) { jQuery(sel).trigger('change.select2'); } sel.dispatchEvent(new Event('change',{bubbles:true})); }); });
+  const typeInput = orderForm.querySelector('[name="type"]');
+  if (!typeInput.value){ typeInput.value = 'service'; }
+  typeInput.addEventListener('change', toggleBoxes); toggleBoxes();
+  document.querySelectorAll('.type-toggle').forEach(btn=>{ btn.addEventListener('click', ()=>{ typeInput.value = btn.dataset.type; typeInput.dispatchEvent(new Event('change',{bubbles:true})); }); });
 
-  // Keep selects static; no inventory API integration
+  // Inventory integration: item-brand consistency and stock hint
+  const selItem = orderForm.querySelector('[name="item_name"]');
+  const selBrand = orderForm.querySelector('[name="brand"]');
+  const qtyInput = orderForm.querySelector('[name="quantity"]');
+  const stockHint = document.getElementById('stockHint');
+
+  async function apiGet(url){ try{ const r = await fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); } catch(e){ return {}; } }
+  function setOptions(select, items, placeholder){ const current = select.value; const opts = [`<option value="">${placeholder}</option>`].concat(items.map(i=>`<option value="${i.value}">${i.label}</option>`)); select.innerHTML = opts.join(''); if (items.some(i=>i.value===current)) { select.value = current; } else { select.value = ''; }
+    if (window.jQuery && jQuery.fn.select2) { jQuery(select).trigger('change.select2'); }
+  }
+  async function loadBrands(){ const name = (selItem?.value||'').trim(); if(!selBrand) return; if(!name){ setOptions(selBrand, [], 'Select brand'); updateStock(); return; }
+    const data = await apiGet(`{% url 'tracker:api_inventory_brands' %}?name=${encodeURIComponent(name)}`); const brands = (data.brands||[]).map(b=>({ value: b.brand, label: b.brand+(b.quantity? ` (qty: ${b.quantity})`: '') })); setOptions(selBrand, brands, 'Select brand'); updateStock(); }
+  async function updateStock(){ if(!selItem||!selBrand||!qtyInput||!stockHint) return; const name = (selItem.value||'').trim(); const brand = (selBrand.value||'').trim(); if(!name||!brand){ stockHint.textContent=''; qtyInput.removeAttribute('max'); return; }
+    const data = await apiGet(`{% url 'tracker:api_inventory_stock' %}?name=${encodeURIComponent(name)}&brand=${encodeURIComponent(brand)}`); const available = parseInt(data.available||0,10); if(available>=0){ stockHint.textContent = `Available: ${available}`; qtyInput.max = available>0? available: null; if(available>0 && (!qtyInput.value || parseInt(qtyInput.value,10)<=0)){ qtyInput.value = 1; } }
+  }
+  selItem?.addEventListener('change', loadBrands);
+  selBrand?.addEventListener('change', updateStock);
+  qtyInput?.addEventListener('input', ()=>{ const max = parseInt(qtyInput.max||0,10); if(max && parseInt(qtyInput.value||0,10) > max){ qtyInput.value = max; } });
+  if (selItem && selItem.value){ loadBrands(); }
 
   // Lightweight JSON fetch helper
   async function fetchJSON(url){
