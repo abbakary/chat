@@ -466,7 +466,7 @@ def order_start(request: HttpRequest):
             name = (order_data.get('item_name') or '').strip()
             brand = (order_data.get('brand') or '').strip()
             try:
-                qty = int(order_data.get('quantity') or 0)
+                qty = int(request.POST.get('quantity') or 0)
             except (TypeError, ValueError):
                 qty = 0
             if not name or not brand or qty <= 0:
@@ -480,6 +480,7 @@ def order_start(request: HttpRequest):
                 return JsonResponse({'success': False, 'message': 'Item not found in inventory', 'code': 'not_found'})
             if available < qty:
                 return JsonResponse({'success': False, 'message': f'Only {available} in stock for {name} ({brand})', 'code': 'insufficient_stock', 'available': available})
+            order_data['quantity'] = qty
         order = Order.objects.create(**order_data)
         remaining = None
         if order.type == 'sales':
