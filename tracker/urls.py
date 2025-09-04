@@ -43,6 +43,7 @@ urlpatterns = [
 
     # User management (admin)
     path("users/", views.users_list, name="users_list"),
+    path("users/add/", views.user_create, name="user_create"),
     path("users/<int:pk>/edit/", views.user_edit, name="user_edit"),
 
     # Admin: system settings and tools

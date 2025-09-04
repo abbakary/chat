@@ -1024,6 +1024,22 @@ def users_list(request: HttpRequest):
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
+def user_create(request: HttpRequest):
+    from .forms import AdminUserCreateForm
+    if request.method == 'POST':
+        form = AdminUserCreateForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'User created')
+            return redirect('tracker:users_list')
+        else:
+            messages.error(request, 'Please correct errors and try again')
+    else:
+        form = AdminUserCreateForm()
+    return render(request, 'tracker/user_create.html', { 'form': form })
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
 def user_edit(request: HttpRequest, pk: int):
     from .forms import AdminUserForm
     u = get_object_or_404(User, pk=pk)
