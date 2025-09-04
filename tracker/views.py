@@ -322,7 +322,8 @@ def customer_register(request: HttpRequest):
                 o.save()
                 if o.type == 'sales':
                     from .utils import adjust_inventory
-                    adjust_inventory(o.item_name, o.brand, -(o.quantity or 0))
+                    qty_int = int(o.quantity or 0)
+                    adjust_inventory(o.item_name, o.brand, -qty_int)
                 for key in ["reg_step1", "reg_step2", "reg_step3"]:
                     request.session.pop(key, None)
                 messages.success(request, "Customer registered and order created successfully")
