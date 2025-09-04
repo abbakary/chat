@@ -1031,7 +1031,8 @@ def user_create(request: HttpRequest):
     if request.method == 'POST':
         form = AdminUserCreateForm(request.POST)
         if form.is_valid():
-            form.save()
+            new_user = form.save()
+            add_audit_log(request.user, 'user_create', f'Created user {new_user.username}')
             messages.success(request, 'User created')
             return redirect('tracker:users_list')
         else:
