@@ -9,7 +9,7 @@
     </div>
   </div>
   <div class="row g-3">
-    <div class="col-lg-6">
+    <div class="col-lg-4">
       <div class="card h-100">
         <div class="card-body">
           <h5 class="mb-2">Export</h5>
@@ -18,7 +18,21 @@
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h5 class="mb-2">Restore</h5>
+          <p class="text-muted">Upload a backup JSON to restore settings.</p>
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="restore_settings">
+            <input class="form-control mb-2" type="file" name="file" accept="application/json">
+            <button class="btn btn-outline-primary" type="submit">Restore Settings</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
       <div class="card h-100">
         <div class="card-body">
           <h5 class="mb-2">Reset</h5>
