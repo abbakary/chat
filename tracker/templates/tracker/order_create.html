@@ -370,7 +370,7 @@
     const cid = customerIdInput.value; if(!cid){ notify('Please select a customer first.','warning'); return; }
     const descEl = orderForm.querySelector('[name="description"]');
     if (descEl){ const extra = buildServiceDetails(); if(extra && !descEl.value.includes('Details:')) descEl.value = (descEl.value||'') + '\n' + extra; }
-    const fd = new FormData(orderForm); fd.set('customer_id', cid);
+    const fd = new FormData(orderForm); fd.set('customer_id', cid); fd.set('type', (typeInput && typeInput.value) ? typeInput.value : 'service');
     try{
       const r = await fetch(orderForm.action, { method:'POST', headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCSRF() }, body: fd });
       if(!r.ok){ const txt = await r.text(); throw new Error(txt || ('HTTP '+r.status)); }
