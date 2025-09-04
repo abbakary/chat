@@ -1124,12 +1124,13 @@ def inquiry_respond(request: HttpRequest, pk: int):
             messages.error(request, 'Response message is required')
             return redirect('tracker:inquiries')
 
-        # Append response to inquiry notes
+        # Append response into inquiry questions thread
         stamp = timezone.now().strftime('%Y-%m-%d %H:%M')
-        if inquiry.notes:
-            inquiry.notes += f"\n\n[{stamp}] Response: {response_text}"
+        trail = f"[{stamp}] Response: {response_text}"
+        if inquiry.questions:
+            inquiry.questions = (inquiry.questions or '') + "\n\n" + trail
         else:
-            inquiry.notes = f"[{stamp}] Response: {response_text}"
+            inquiry.questions = trail
 
         # Update follow-up date if required
         if follow_up_required and follow_up_date:
