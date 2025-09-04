@@ -109,10 +109,13 @@
     font-size: 0.8rem;
     color: #6c757d;
   }
-  .page-header .card-body{overflow:visible}
-  .page-header .header-actions{flex-wrap:wrap; max-width:100%; overflow:visible}
-  .page-header .header-actions .btn{white-space:nowrap}
-  @media (max-width: 576px){ .page-header .header-actions .btn{width:100%} }
+  .page-header .card-body { overflow: visible; position: relative; }
+  .orders-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+  .orders-header-title { flex: 1 1 auto; min-width: 180px; }
+  .orders-header-actions { display: flex; flex-wrap: wrap; gap: .5rem; flex: 0 0 auto; max-width: 100%; overflow: visible; position: relative; z-index: 2; }
+  .orders-header-actions .btn { white-space: nowrap; }
+  @media (max-width: 992px) { .orders-header-actions { width: 100%; justify-content: flex-start; } }
+  @media (max-width: 576px) { .orders-header-actions .btn { width: 100%; } }
 </style>
 {% endblock %}
 
@@ -121,9 +124,9 @@
   <!-- Page Header -->
   <div class="page-header card">
     <div class="card-body">
-      <div class="d-flex flex-column flex-sm-row align-items-start justify-content-between gap-2">
-        <h3 class="mb-0">Orders</h3>
-        <div class="header-actions d-flex gap-2 flex-wrap w-100 justify-content-start justify-content-sm-end ms-sm-auto">
+      <div class="orders-header d-flex flex-column flex-sm-row align-items-start justify-content-between gap-2">
+        <h3 class="orders-header-title mb-0">Orders</h3>
+        <div class="orders-header-actions header-actions d-flex gap-2 flex-wrap w-100 justify-content-start justify-content-sm-end ms-sm-auto">
           <a class="btn btn-light flex-shrink-0" href="{% url 'tracker:orders_export' %}?status={{ request.GET.status|default:'all' }}&type={{ request.GET.type|default:'all' }}">
             <i data-feather="download" class="me-1"></i><span>Export CSV</span>
           </a>
