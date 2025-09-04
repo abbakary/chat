@@ -361,17 +361,36 @@
     if (vehicleSelect){ const placeholder = vehicleSelect.querySelector('option[value=\"\"]')?.outerHTML || '<option value=\"\">---------</option>'; vehicleSelect.innerHTML = placeholder + ((r.vehicles||[]).map(v=>`<option value=\"${v.id}\">${v.plate_number||''} ${v.make||''} ${v.model||''}</option>`).join('')); if ($ && $.fn.select2){ $(vehicleSelect).trigger('change.select2'); } }
     if(window.feather) feather.replace(); });
 
+  function notify(msg, type){
+    if (window.jQuery && $.notify){ $.notify({message: msg},{ type: type||'info', delay: 1500, placement:{from:'top',align:'right'} }); }
+    else { alert(msg); }
+  }
+
   btnSubmitAjax?.addEventListener('click', async ()=>{
-    const cid = customerIdInput.value; if(!cid){ alert('Please select a customer first.'); return; }
+    const cid = customerIdInput.value; if(!cid){ notify('Please select a customer first.','warning'); return; }
     const descEl = orderForm.querySelector('[name="description"]');
     if (descEl){ const extra = buildServiceDetails(); if(extra && !descEl.value.includes('Details:')) descEl.value = (descEl.value||'') + '\n' + extra; }
     const fd = new FormData(orderForm); fd.set('customer_id', cid);
     try{
       const r = await fetch(orderForm.action, { method:'POST', headers:{ 'X-Requested-With':'XMLHttpRequest', 'X-CSRFToken': getCSRF() }, body: fd });
-      const data = await r.json();
-      if(data.success){ window.location = '{% url 'tracker:order_detail' 0 %}'.replace('/0/','/'+data.order_id+'/'); }
-      else { alert(data.message||'Could not create order'); if(data.code==='insufficient_stock' && typeof data.available!=='undefined'){ if(qtyInput){ qtyInput.max=data.available; if(parseInt(qtyInput.value||0,10) > data.available){ qtyInput.value = data.available; } } if (typeof updateStock === 'function') { updateStock(); } } }
-    }catch(e){ alert('Network error. Please try again.'); }
+      if(!r.ok){ const txt = await r.text(); throw new Error(txt || ('HTTP '+r.status)); }
+      let data = null; const ct = r.headers.get('content-type')||'';
+      if (ct.includes('application/json')){ data = await r.json(); }
+      else { const txt = await r.text(); throw new Error(txt || 'Unexpected response'); }
+      if(data && data.success){
+        notify('Order created successfully','success');
+        const target = data.order_id ? '{% url 'tracker:order_detail' 0 %}'.replace('/0/','/'+data.order_id+'/') : '{% url 'tracker:orders_list' %}';
+        setTimeout(()=>{ window.location = target; }, 600);
+      } else {
+        notify(data && data.message ? data.message : 'Could not create order','danger');
+        if(data && data.code==='insufficient_stock' && typeof data.available!=='undefined'){
+          if(qtyInput){ qtyInput.max=data.available; if(parseInt(qtyInput.value||0,10) > data.available){ qtyInput.value = data.available; } }
+          if (typeof updateStock === 'function') { updateStock(); }
+        }
+      }
+    }catch(e){
+      notify('Request failed. Please try again.','danger');
+    }
   });
 
   if('{{ customer.id|default:"" }}'){ customerExtra.classList.remove('d-none'); }
