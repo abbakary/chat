@@ -521,7 +521,8 @@ def order_start(request: HttpRequest):
         o.save()
         if o.type == 'sales':
             from .utils import adjust_inventory
-            ok, status, remaining = adjust_inventory(o.item_name, o.brand, -(o.quantity or 0))
+            qty_int = int(o.quantity or 0)
+            ok, status, remaining = adjust_inventory(o.item_name, o.brand, -qty_int)
             if ok:
                 messages.success(request, f"Order created. Remaining stock for {o.item_name} ({o.brand}): {remaining}")
             else:
