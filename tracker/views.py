@@ -450,12 +450,12 @@ def order_start(request: HttpRequest):
             'status': 'created',
             'description': request.POST.get('description', ''),
             'estimated_duration': request.POST.get('estimated_duration') or None,
-            'item_name': request.POST.get('item_name', ''),
-            'brand': request.POST.get('brand', ''),
-            'quantity': request.POST.get('quantity') or None,
-            'inquiry_type': request.POST.get('inquiry_type', ''),
+            'item_name': (request.POST.get('item_name') or '').strip(),
+            'brand': (request.POST.get('brand') or '').strip(),
+            'quantity': None,
+            'inquiry_type': (request.POST.get('inquiry_type') or '').strip(),
             'questions': request.POST.get('questions', ''),
-            'contact_preference': request.POST.get('contact_preference', ''),
+            'contact_preference': (request.POST.get('contact_preference') or '').strip(),
             'follow_up_date': request.POST.get('follow_up_date') or None,
         }
         vehicle_id = request.POST.get('vehicle')
