@@ -84,6 +84,7 @@
                 <ul class="sidebar-submenu">
                   <li><a href="{% url 'tracker:customers_list' %}">All Customers</a></li>
                   <li><a href="{% url 'tracker:customer_register' %}">Register Customer</a></li>
+                  <li><a href="{% url 'tracker:customers_export' %}">Export Customers</a></li>
                   {% if request.user.is_superuser %}
                   <li><a href="{% url 'tracker:organization' %}">Organizations</a></li>
                   {% endif %}
