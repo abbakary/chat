@@ -962,6 +962,10 @@ def inventory_create(request: HttpRequest):
             item = form.save()
             from .utils import clear_inventory_cache
             clear_inventory_cache(item.name, item.brand)
+            try:
+                add_audit_log(request.user, 'inventory_create', f"Item '{item.name}' ({item.brand or 'Unbranded'}) qty={item.quantity}")
+            except Exception:
+                pass
             messages.success(request, 'Inventory item created')
             return redirect('tracker:inventory_list')
         else:
