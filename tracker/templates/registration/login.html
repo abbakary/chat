@@ -26,9 +26,10 @@
 
     /* Tyre animation */
     .tyre-wrap { position: relative; height: 240px; margin: 2rem auto 0; }
-    .tyre-img { position: absolute; top: 0; height: 240px; width: auto; filter: drop-shadow(0 12px 24px rgba(0,0,0,.5)); animation: drive 10s linear infinite, spin 1.2s linear infinite; }
+    .tyre-mover { position: absolute; top: 0; left: 0; right: 0; animation: drive 10s linear infinite; }
+    .tyre-img { height: 240px; width: auto; filter: drop-shadow(0 12px 24px rgba(0,0,0,.5)); animation: spin 1.2s linear infinite; }
     @keyframes drive { 0%{ transform: translateX(-120%); } 100%{ transform: translateX(120%); } }
-    @keyframes spin { from{ transform: translateX(-120%) rotate(0deg);} to{ transform: translateX(120%) rotate(360deg);} }
+    @keyframes spin { from{ transform: rotate(0deg);} to{ transform: rotate(360deg);} }
 
     /* Floating particles */
     .particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -75,7 +76,9 @@
           <span class="word-2">Superdoll</span>
         </div>
         <div class="tyre-wrap">
-          <img class="tyre-img" src="https://cdn.builder.io/api/v1/image/assets%2F01822e59c2f24bdb866eced0eaa42d47%2Fa3173fa341404f049229e35c2422b511?format=webp&width=800" alt="Tyre moving">
+          <div class="tyre-mover">
+            <img class="tyre-img" src="https://cdn.builder.io/api/v1/image/assets%2F01822e59c2f24bdb866eced0eaa42d47%2Fa3173fa341404f049229e35c2422b511?format=webp&width=800" alt="Tyre moving">
+          </div>
         </div>
       </div>
       <div class="wave">
