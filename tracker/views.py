@@ -1260,6 +1260,10 @@ def inquiry_respond(request: HttpRequest, pk: int):
             inquiry.status = 'in_progress'
 
         inquiry.save()
+        try:
+            add_audit_log(request.user, 'inquiry_respond', f"Responded to inquiry #{inquiry.id} for {inquiry.customer.full_name}")
+        except Exception:
+            pass
 
         # Send SMS to the customer's phone
         phone = inquiry.customer.phone
